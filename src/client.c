@@ -2,9 +2,25 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include "common.h"
 
+struct sockaddr_in client;
+static struct sockaddr_in server;
 static int port; 
-static struct sockaddr_in* server;
+int sockfd;
+
+void usage()
+{
+    printf("Usage: client -p [port] -s [server address]\n");
+    printf("Both port and server arguments are required.\n");
+}
+
 int main(int argc, char** argv) 
 {
 	char* s_port;
@@ -22,20 +38,31 @@ int main(int argc, char** argv)
 				break;
 			default: 
 				usage();
-				break;
-		}
-	}
-	printf("Attempting to connect to server: %s:%s", s_addr, s_port);
-	getaddrinfo(s_addr, s_port, 0, &server);
-	struct sockaddr_in* ptr;
-	for (ptr = server; ptr != NULL; ptr = ptr->ai_next) 
-	{
-		if (ptr->ai_addr->sa_family == AF_INET)
-		{
-			server = ptr;	
-			break;
+                exit(-1);
 		}
 	}
 
+    if ((port = atoi(s_port))) 
+    {
+        //printf("Unable to parse port as number. Exiting with error code %s\n", strerror(errno));
+        log_error("Unable to parse port as number.");
+        exit(-1);
+    }
+    memset(&server, 0, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = inet_addr(s_addr);
+    server.sin_port = htons(port);
+
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0))) 
+    {
+        printf("Unable to open socket. Exiting with error code %s\n", strerror(errno));
+        exit(-1);
+    }
+	printf("Attempting to connect to server: %s:%s\n", s_addr, s_port);
+    if (connect(sockfd, (struct sockaddr*) &server, sizeof(server)))
+    {
+        printf("Unable to connect to server. Exiting with error code %s\n", strerror(errno));
+        exit(-1);
+    }
 
 }
