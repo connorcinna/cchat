@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include "common.h"
 
 struct sockaddr_in client;
 static struct sockaddr_in server;
@@ -45,7 +44,7 @@ int main(int argc, char** argv)
     if ((port = atoi(s_port))) 
     {
         //printf("Unable to parse port as number. Exiting with error code %s\n", strerror(errno));
-        log_error("Unable to parse port as number.");
+        debug_log("Unable to parse port as number.", );
         exit(-1);
     }
     memset(&server, 0, sizeof(server));
@@ -55,10 +54,11 @@ int main(int argc, char** argv)
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0))) 
     {
-        printf("Unable to open socket. Exiting with error code %s\n", strerror(errno));
+        //printf("Unable to open socket. Exiting with error code %s\n", strerror(errno));
+        debug_log("Unable to open socket\n");
         exit(-1);
     }
-	printf("Attempting to connect to server: %s:%s\n", s_addr, s_port);
+	debug_log("Attempting to connect to server: %s:%s\n", s_addr, s_port);
     if (connect(sockfd, (struct sockaddr*) &server, sizeof(server)))
     {
         printf("Unable to connect to server. Exiting with error code %s\n", strerror(errno));
