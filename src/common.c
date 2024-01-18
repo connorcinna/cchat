@@ -1,21 +1,19 @@
 #include <errno.h>
 #include <stdio.h>
-
-enum log_severity
-{
-    INFO,
-    WARN,
-    SEVERE,
-    FATAL
-};
-typedef enum log_severity log_severity_t;
+#include <stdarg.h>
+#include "common.h"
 
 const char* log_dir = "../log/";
 
 //Generic log function, writes to log file
-void debug_log(log_severity_t level, const char* msg, char const* filename)
+void debug_log(log_severity_t level, char const* filename, char* msg, ...)
 {
-    printf("%s: %s", filename, msg);
+	va_list argp;
+	va_start(argp, msg);
+
+    vprintf(msg, argp);
+
+	va_end(argp);
     //open log_file,write the same message
 }
 

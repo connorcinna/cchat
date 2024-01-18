@@ -11,7 +11,7 @@ server: $(SRCDIR)/server.c $(SRCDIR)/server.h
 	$(CC) -o $(BUILDDIR)/server $(SRCDIR)/server.c $(LIBDIR)/libcommon.o
 client: $(SRCDIR)/client.c
 	$(CC) -o $(BUILDDIR)/client $(SRCDIR)/client.c $(LIBDIR)/libcommon.o
-common: $(SRCDIR)/common.c 
+common: $(SRCDIR)/common.c $(SRCDIR)/common.h
 	$(CC) -c -o $(LIBDIR)/libcommon.o $(SRCDIR)/common.c
 
 all: common server client
