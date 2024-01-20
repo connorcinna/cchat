@@ -5,8 +5,12 @@ DEPS = server.h
 SRCDIR=$(CURDIR)/src
 BUILDDIR=$(CURDIR)/bin
 LIBDIR=$(CURDIR)/lib
+LOGDIR=$(CURDIR)/log
 
-
+dirs: 
+	mkdir -p $(BUILDDIR) 
+	mkdir -p $(LIBDIR)
+	mkdir -p $(LOGDIR)
 server: $(SRCDIR)/server.c $(SRCDIR)/server.h
 	$(CC) -o $(BUILDDIR)/server $(SRCDIR)/server.c $(LIBDIR)/libcommon.o
 client: $(SRCDIR)/client.c
@@ -14,7 +18,7 @@ client: $(SRCDIR)/client.c
 common: $(SRCDIR)/common.c $(SRCDIR)/common.h
 	$(CC) -c -o $(LIBDIR)/libcommon.o $(SRCDIR)/common.c
 
-all: common server client
+all: dirs common server client
 clean: 
 	rm -f $(BUILDDIR)/*
 	rm -f $(LIBDIR)/*
