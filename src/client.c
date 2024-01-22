@@ -41,10 +41,13 @@ int main(int argc, char** argv)
                 exit(-1);
 		}
 	}
-
+    if (!s_port) 
+    {
+        debug_log(FATAL, __FILE__, "No port passed as arg.\n");
+        exit(-1);
+    }
     if ((port = atoi(s_port))) 
     {
-        //printf("Unable to parse port as number. Exiting with error code %s\n", strerror(errno));
         debug_log(FATAL, __FILE__, "Unable to parse port as number.\n");
         exit(-1);
     }

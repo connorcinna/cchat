@@ -7,8 +7,6 @@
 #include <string.h>
 #include <netinet/in.h>
 #include "server.h"
-#include "common.h"
-
 static int port;
 
 int main(int argc, char** argv)
@@ -32,9 +30,17 @@ int main(int argc, char** argv)
 				break;
 		}
 	}
-	//printf("using port %s\n", s_port);
+    if (!s_port) 
+    {
+        debug_log(FATAL, __FILE__, "No port provided.\n");
+        usage();
+    }
 	debug_log(INFO, __FILE__, "using port %s\n", s_port);
-	port = atoi(s_port);
+	if (!(port = atoi(s_port))) 
+    {
+        debug_log(FATAL, __FILE__, "Unable to parse port into number.\n");
+        usage();
+    }
 	//bind to a socket and listen to it for incoming connections
 	sockfd = listen_server(port);
 	int client_addr_len = sizeof(client_addr);
@@ -51,6 +57,7 @@ void usage()
 {
 	printf("Usage: server -p [PORT]\n");
 	printf("Begin a TCP server listening on the given port.\n");
+    exit(-1);
 }
 
 int listen_server(int port)
@@ -59,11 +66,9 @@ int listen_server(int port)
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (!sockfd)
 	{
-		//printf("Failed to open TCP server socket");
 		debug_log(FATAL, __FILE__, "Failed to open TCP server socket");
 		exit(-1);
 	}
-	//printf("TCP server socket opened on %d\n", sockfd);
 	debug_log(INFO, __FILE__, "TCP server socket opened on %d\n", sockfd);
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_family = AF_INET;
@@ -72,17 +77,14 @@ int listen_server(int port)
 
 	if ((bind(sockfd, (struct sockaddr*)&sa, sizeof(sa))) != 0)
 	{
-		//printf("Server failed to bind to socket %d\n", sockfd);
 		debug_log(FATAL, __FILE__, "Server failed to bind to socket %d\n", sockfd);
 		exit(-1);
 	}
 	if (listen(sockfd, MAXCONN) != 0)
 	{
-		//printf("Server failed to listen on socket %d\n", sockfd);
 		debug_log(FATAL, __FILE__, "Server failed to listen on socket %d\n", sockfd);
 		exit(-1);
 	}
-	//printf("Server listening on port %d\n", port);
 	debug_log(INFO, __FILE__, "Server listening on port %d\n", port);
 	return sockfd;
 }
@@ -95,12 +97,10 @@ void handle_connection(int connfd)
 		memset(buff, 0, BUFF_SZ);
 
 		rcvd = read(connfd, buff, BUFF_SZ);
-		//printf("Read %zd bytes from client with message %s\n", rcvd, buff);
 		debug_log(INFO, __FILE__, "Read %zd bytes from client with message %s\n", rcvd, buff);
 		memset(buff, 0, BUFF_SZ);
 		if (strncmp("exit", buff, 4) == 0)
 		{
-			//printf("Disconnecting client from server\n");
 			debug_log(WARN, __FILE__, "Disconnecting client from server\n");
 			break;
 		}

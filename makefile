@@ -1,7 +1,5 @@
 CC=gcc
 CLFAGS=-I.
-LDFLAGS= -L $(LIBDIR) -l libcommon.o
-DEPS = server.h
 SRCDIR=$(CURDIR)/src
 BUILDDIR=$(CURDIR)/bin
 LIBDIR=$(CURDIR)/lib
