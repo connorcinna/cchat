@@ -6,12 +6,10 @@ LIBDIR=$(CURDIR)/lib
 LOGDIR=$(CURDIR)/log
 
 dirs: 
-	mkdir -p $(BUILDDIR) 
-	mkdir -p $(LIBDIR)
-	mkdir -p $(LOGDIR)
-server: $(SRCDIR)/server.c $(SRCDIR)/server.h
+	mkdir -p $(BUILDDIR) $(LIBDIR) $(LOGDIR)
+server: $(SRCDIR)/server.c $(SRCDIR)/server.h $(SRCDIR)/common.h
 	$(CC) -o $(BUILDDIR)/server $(SRCDIR)/server.c $(LIBDIR)/libcommon.o
-client: $(SRCDIR)/client.c
+client: $(SRCDIR)/client.c 
 	$(CC) -o $(BUILDDIR)/client $(SRCDIR)/client.c $(LIBDIR)/libcommon.o
 common: $(SRCDIR)/common.c $(SRCDIR)/common.h
 	$(CC) -c -o $(LIBDIR)/libcommon.o $(SRCDIR)/common.c

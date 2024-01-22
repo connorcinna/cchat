@@ -7,6 +7,7 @@
 #include <string.h>
 #include <netinet/in.h>
 #include "server.h"
+#include "common.h"
 static int port;
 
 int main(int argc, char** argv)
