@@ -14,11 +14,10 @@ const char* log_color[5] =
     "\033[0m"     //reset to default 
 };
 
-static char cwd[256];
+char cwd[256];
 
 void init_log_path()
 {
-    //char cwd[256];
     if (!getcwd(cwd, sizeof(cwd)))
     {
         printf("Unable to get current working directory: %s\n", strerror(errno));
@@ -28,8 +27,13 @@ void init_log_path()
 
 void debug_log(log_severity_t level, char const* filename, char* msg, ...)
 {
+    if (cwd[0] == '\0')
+    {
+        init_log_path();
+    }
     FILE* out;
     set_print_color(level);
+    //get current time
     //initialize the format argument array
 	va_list argp;
 	va_start(argp, msg);

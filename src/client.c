@@ -27,8 +27,6 @@ int main(int argc, char** argv)
 	char* s_addr;
 	int arg;
 
-    init_log_path();
-
 	while((arg = getopt(argc, argv, "ps:")) != -1) 
 	{
 		switch (arg)
