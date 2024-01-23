@@ -19,6 +19,8 @@ int main(int argc, char** argv)
 	int connection_count = 0;
 	int arg;
 
+    init_log_path();
+
 	while((arg = getopt(argc, argv, "p:")) != -1)
 	{
 		switch (arg)

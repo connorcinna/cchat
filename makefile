@@ -1,5 +1,5 @@
 CC=gcc
-CLFAGS=-I.
+CLFAGS=-I. -g
 SRCDIR=$(CURDIR)/src
 BUILDDIR=$(CURDIR)/bin
 LIBDIR=$(CURDIR)/lib
@@ -18,3 +18,4 @@ all: dirs common server client
 clean: 
 	rm -f $(BUILDDIR)/*
 	rm -f $(LIBDIR)/*
+	rm -f $(LOGDIR)/*

@@ -11,6 +11,9 @@ enum log_severity
 
 typedef enum log_severity log_severity_t;
 
+//initializes the log path for this module
+void init_log_path();
+
 //Generic log function, writes to log file
 void debug_log(log_severity_t level, char const* filename, char* msg, ...);
 

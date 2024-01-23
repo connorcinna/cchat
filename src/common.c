@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <unistd.h>
 #include "common.h"
 
 const char* log_color[5] = 
@@ -13,33 +14,44 @@ const char* log_color[5] =
     "\033[0m"     //reset to default 
 };
 
-const char* log_file = "../log/debug.log";
+static char cwd[256];
+
+void init_log_path()
+{
+    //char cwd[256];
+    if (!getcwd(cwd, sizeof(cwd)))
+    {
+        printf("Unable to get current working directory: %s\n", strerror(errno));
+    }
+    strcat(cwd, "/log/debug.log");
+}
 
 void debug_log(log_severity_t level, char const* filename, char* msg, ...)
 {
-    printf("Setting log color\n");
+    FILE* out;
     set_print_color(level);
-    printf("Getting va_list\n");
+    //initialize the format argument array
 	va_list argp;
-    printf("Calling va_start\n");
 	va_start(argp, msg);
+    //make a copy of the format arguments - used when writing to the file
     va_list copy;
     va_copy(copy, argp);
-    printf("Calling vprintf\n");
+    //print to console
     vprintf(msg, argp);
-    printf("Resetting color\n");
+    //reset print color back to default
     set_print_color(DEFAULT);
-    //open log_file, write the same message
-    printf("Opening log file\n");
-	FILE* out = fopen(log_file, "a");
-    printf("Printing to file\n");
+    //open cwd, write the same message
+	if (!(out = fopen(cwd, "a"))) 
+    {
+        printf("Unable to open file %s: %s\n", cwd, strerror(errno));
+    }
+    //print to file
     if (!vfprintf(out, msg, copy))
     {
         printf("Error writing to file: %s", strerror(errno));
     }
-    printf("Closing file descriptor\n");
+    //free resources
 	fclose(out);
-    printf("Calling va_end\n");
 	va_end(argp);
     va_end(copy);
 }
