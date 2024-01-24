@@ -3,6 +3,8 @@
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
+#include <stdlib.h>
 #include "common.h"
 
 const char* log_color[5] = 
@@ -16,13 +18,28 @@ const char* log_color[5] =
 
 char cwd[256];
 
-void init_log_path()
+void init_log_path(void)
 {
     if (!getcwd(cwd, sizeof(cwd)))
     {
         printf("Unable to get current working directory: %s\n", strerror(errno));
     }
     strcat(cwd, "/log/debug.log");
+}
+
+char* log_prefix(char const* filename)
+{
+	char out[512];
+	time_t raw_time = time(NULL);
+	struct tm* local_time = localtime(&raw_time);
+	char* str_time = asctime(local_time);
+	str_time[strcspn(str_time, "\n")] = 0; //strip the newline character
+	strcpy(out, str_time);
+	strcat(out, " ");
+	strcat(out, filename);
+	char* ret = malloc(sizeof(out));
+	memcpy(ret, out, sizeof(out));
+	return ret;
 }
 
 void debug_log(log_severity_t level, char const* filename, char* msg, ...)
@@ -34,13 +51,16 @@ void debug_log(log_severity_t level, char const* filename, char* msg, ...)
     FILE* out;
     set_print_color(level);
     //get current time
-    //initialize the format argument array
+	//initialize the format argument array
 	va_list argp;
 	va_start(argp, msg);
     //make a copy of the format arguments - used when writing to the file
     va_list copy;
     va_copy(copy, argp);
-    //print to console
+    //print timestamp and file this came from 
+	char* pre = log_prefix(filename);
+	printf("[ %s ] ", pre);
+	//print formatted string
     vprintf(msg, argp);
     //reset print color back to default
     set_print_color(DEFAULT);
@@ -55,6 +75,7 @@ void debug_log(log_severity_t level, char const* filename, char* msg, ...)
         printf("Error writing to file: %s", strerror(errno));
     }
     //free resources
+	free(pre);
 	fclose(out);
 	va_end(argp);
     va_end(copy);
