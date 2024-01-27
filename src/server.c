@@ -31,13 +31,13 @@ int main(int argc, char** argv)
 				break;
 		}
 	}
-    if (!s_port) 
+    if (!s_port)
     {
         debug_log(FATAL, __FILE__, "No port provided.\n");
         usage();
     }
 	debug_log(INFO, __FILE__, "using port %s\n", s_port);
-	if (!(port = atoi(s_port))) 
+	if (!(port = atoi(s_port)))
     {
         debug_log(FATAL, __FILE__, "Unable to parse port into number.\n");
         usage();
@@ -89,6 +89,7 @@ int listen_server(int port)
 	debug_log(INFO, __FILE__, "Server listening on port %d\n", port);
 	return sockfd;
 }
+//TODO: make this a thread, otherwise this will only handle one connection
 void handle_connection(int connfd)
 {
 	char buf[BUF_SZ];
@@ -103,6 +104,13 @@ void handle_connection(int connfd)
 		if (strncmp("exit", buf, 4) == 0)
 		{
 			debug_log(WARN, __FILE__, "Disconnecting client from server\n");
+			close(connfd);
+			break;
+		}
+		else if (rcvd == 0)
+		{
+			debug_log(WARN, __FILE__, "Client disconnect received -- closing connection\n");
+			close(connfd);
 			break;
 		}
 	}

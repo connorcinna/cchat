@@ -15,16 +15,40 @@ struct sockaddr_in server;
 static int port; 
 int sockfd;
 
-void usage()
+void usage(void)
 {
     printf("Usage: client -p [port] -s [server address]\n");
     printf("Both port and server arguments are required.\n");
+	exit(-1);
+}
+
+void work(void) 
+{
+	char buf[BUF_SZ];
+	for(;;)
+	{
+		//send packets to server
+		//get stdin
+		//check if the length is more than a certain packet size limit
+		//pack it in an array 
+		//ship it
+		memset(buf, 0, BUF_SZ);
+		ssize_t bytes_read = read(STDIN_FILENO, buf, BUF_SZ);
+		if (bytes_read > 255)
+		{
+			//TODO: split up the message into chunks
+			debug_log(INFO, __FILE__, "Message too long -- discarding\n");
+			continue;
+		}
+		buf[bytes_read] = '\0';
+		sendto(sockfd, (void*) buf, sizeof(buf), 0, (struct sockaddr*) &server, sizeof(server));
+	}
 }
 
 int main(int argc, char** argv) 
 {
-	char* s_port;
-	char* s_addr;
+	char* s_port = NULL;
+	char* s_addr = NULL;
 	int arg;
 
 	while((arg = getopt(argc, argv, "p:s:")) != -1) 
@@ -41,23 +65,22 @@ int main(int argc, char** argv)
 				break;
 			default: 
 				usage();
-                exit(-1);
 		}
 	}
     if (!s_port) 
     {
         debug_log(FATAL, __FILE__, "No port passed as arg.\n");
-        exit(-1);
+		usage();
     }
     if (!(port = atoi(s_port))) 
     {
         debug_log(FATAL, __FILE__, "Unable to parse port as number.\n");
-        exit(-1);
+		usage();
     }
 	if (!s_addr) 
     {
         debug_log(FATAL, __FILE__, "No server address passed as arg.\n");
-        exit(-1);
+		usage();
     }
     memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
@@ -66,34 +89,19 @@ int main(int argc, char** argv)
 
     if (!(sockfd = socket(AF_INET, SOCK_STREAM, 0))) 
     {
-        debug_log(FATAL, __FILE__, "Unable to open socket: Exiting with error %s\n", strerror(errno));
+        debug_log(FATAL, __FILE__, "Unable to open socket: %s\n", strerror(errno));
         exit(-1);
     }
 	debug_log(INFO, __FILE__, "Attempting to connect to server: %s:%s\n", s_addr, s_port);
     if (connect(sockfd, (struct sockaddr*) &server, sizeof(server)))
     {
-		debug_log(FATAL, __FILE__, "Unable to connect to server. Exiting with error %s\n", strerror(errno));
+		debug_log(FATAL, __FILE__, "Unable to connect to server: %s\n", strerror(errno));
         exit(-1);
     }
 	else 
 	{
 		debug_log(INFO, __FILE__, "Successfully connected to server %s with port %d\n", s_addr, port);
 	}
-	//main loop
-	char buf[BUF_SZ];
-
-	for(;;)
-	{
-		//send packets to server
-		//get stdin, check if the length is more than a certain packet size limit, pack it in an array and ship it
-		memset(buf, 0, BUF_SZ);
-		ssize_t bytes_read = read(STDIN_FILENO, buf, BUF_SZ);
-		if (bytes_read > 255)
-		{
-			//split up the message somehow?
-			debug_log(INFO, __FILE__, "Message too long -- discarding\n");
-		}
-		buf[bytes_read] = '\0';
-		sendto(sockfd, (void*) buf, sizeof(buf), 0, (struct sockaddr*) &server, sizeof(server));
-	}
+	//do client stuff
+	work();
 }
