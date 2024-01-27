@@ -91,16 +91,16 @@ int listen_server(int port)
 }
 void handle_connection(int connfd)
 {
-	char buff[BUFF_SZ];
+	char buf[BUF_SZ];
 	ssize_t rcvd;
 	for (;;)
 	{
-		memset(buff, 0, BUFF_SZ);
+		memset(buf, 0, BUF_SZ);
 
-		rcvd = read(connfd, buff, BUFF_SZ);
-		debug_log(INFO, __FILE__, "Read %zd bytes from client with message %s\n", rcvd, buff);
-		memset(buff, 0, BUFF_SZ);
-		if (strncmp("exit", buff, 4) == 0)
+		rcvd = read(connfd, buf, BUF_SZ);
+		debug_log(INFO, __FILE__, "Read %zd bytes from client with message %s\n", rcvd, buf);
+		memset(buf, 0, BUF_SZ);
+		if (strncmp("exit", buf, 4) == 0)
 		{
 			debug_log(WARN, __FILE__, "Disconnecting client from server\n");
 			break;

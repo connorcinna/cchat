@@ -1,9 +1,6 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#define MAXCONN 10
-#define BUFF_SZ 256
-
 //prints usage information
 void usage();
 

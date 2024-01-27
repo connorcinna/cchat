@@ -1,5 +1,9 @@
 #ifndef COMMON_H
 #define COMMON_H
+
+#define MAXCONN 10
+#define BUF_SZ 256
+
 enum log_severity
 {
     INFO,
