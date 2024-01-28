@@ -6,18 +6,28 @@
 #include <ctype.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <pthread.h>
+#include <errno.h>
 #include "server.h"
 #include "common.h"
-static int port;
 
-int main(int argc, char** argv)
+static uint32_t port; //does not get changed anywhere outside of initialization
+					  //realistically need a better way to pass this around
+//should protect these with a mutex
+static uint32_t connfds[MAXCONN];
+static uint32_t num_conn = 0;
+static struct sockaddr_in clients[MAXCONN];
+
+//in progress
+//TODO: when the server receives data from the client, have the host sendto() that packet to every client
+//so that each client can see what the others are saying
+int32_t main(uint32_t argc, char** argv)
 {
 	char* s_port;
-	struct sockaddr_in client_addr;
-	int sockfd;
-	int connfds[MAXCONN];
-	int connection_count = 0;
-	int arg;
+	//struct sockaddr_in client_addr;
+	uint32_t sockfd;
+
+	uint32_t arg;
 
 	while((arg = getopt(argc, argv, "p:")) != -1)
 	{
@@ -42,15 +52,35 @@ int main(int argc, char** argv)
         debug_log(FATAL, __FILE__, "Unable to parse port into number.\n");
         usage();
     }
+
 	//bind to a socket and listen to it for incoming connections
 	sockfd = listen_server(port);
-	int client_addr_len = sizeof(client_addr);
-	connfds[connection_count] = accept(sockfd, (struct sockaddr*)&client_addr, &client_addr_len);
-	handle_connection(connfds[connection_count]);
-	++connection_count;
 
-	//close the socket file descriptor
-	close(sockfd);
+	while (num_conn < MAXCONN) 
+	{
+		struct sockaddr_in client;
+		if ((connfds[num_conn] = accept(sockfd, (struct sockaddr*) &client, (socklen_t*) sizeof(client))) == -1) 
+		{
+			debug_log(WARN, __FILE__, "Failed to accept connection from client %d: %s", num_conn, strerror(errno));
+		}
+		debug_log(INFO, __FILE__, "Client %d connected on %d\n", num_conn, connfds[num_conn]);
+		pthread_t t;
+		if ((pthread_create(&t, NULL, (void*) work, (void*) &connfds[num_conn]))) 
+		{
+			debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
+		}
+		++num_conn;
+	}
+
+	for (;;) 
+	{
+		if (fgetc(stdin) == 'q')
+		{
+			//close the socket file descriptor
+			close(sockfd);
+			exit(-1);
+		}
+	}
 
 }
 
@@ -61,10 +91,10 @@ void usage()
     exit(-1);
 }
 
-int listen_server(int port)
+uint32_t listen_server(uint32_t port)
 {
 	struct sockaddr_in sa;
-	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	uint32_t sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (!sockfd)
 	{
 		debug_log(FATAL, __FILE__, "Failed to open TCP server socket");
@@ -89,17 +119,30 @@ int listen_server(int port)
 	debug_log(INFO, __FILE__, "Server listening on port %d\n", port);
 	return sockfd;
 }
-//TODO: make this a thread, otherwise this will only handle one connection
-void handle_connection(int connfd)
+
+static void work(void* arg)
 {
+	uint32_t connfd = *(uint32_t*) arg;
 	char buf[BUF_SZ];
 	ssize_t rcvd;
 	for (;;)
 	{
 		memset(buf, 0, BUF_SZ);
-
 		rcvd = read(connfd, buf, BUF_SZ);
-		debug_log(INFO, __FILE__, "Read %zd bytes from client with message %s\n", rcvd, buf);
+		if (rcvd > 0)
+		{
+			debug_log(INFO, __FILE__, "client %d: %s\n", connfd, buf);
+		}
+		//need some way to globally access all connections from any thread
+		//then, here, sendto() every client
+		for (int i = 0; i < num_conn; ++i) 
+		{
+			if (connfds[i] == connfd) //don't resend the clients message back to itself
+			{
+				continue;
+			}
+			sendto(connfds[i], (void*) buf, sizeof(buf), 0, (struct sockaddr*) &clients[i], sizeof(clients[i]));
+		}
 		memset(buf, 0, BUF_SZ);
 		if (strncmp("exit", buf, 4) == 0)
 		{

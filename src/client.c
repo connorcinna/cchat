@@ -8,12 +8,13 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include "common.h"
 
 struct sockaddr_in client;
 struct sockaddr_in server;
 static int port; 
-int sockfd;
+static int sockfd;
 
 void usage(void)
 {
@@ -27,11 +28,6 @@ void work(void)
 	char buf[BUF_SZ];
 	for(;;)
 	{
-		//send packets to server
-		//get stdin
-		//check if the length is more than a certain packet size limit
-		//pack it in an array 
-		//ship it
 		memset(buf, 0, BUF_SZ);
 		ssize_t bytes_read = read(STDIN_FILENO, buf, BUF_SZ);
 		if (bytes_read > 255)
@@ -42,6 +38,21 @@ void work(void)
 		}
 		buf[bytes_read] = '\0';
 		sendto(sockfd, (void*) buf, sizeof(buf), 0, (struct sockaddr*) &server, sizeof(server));
+	}
+}
+
+static void read_resp(void) 
+{
+	char buf[BUF_SZ];
+	ssize_t rcvd;
+	for(;;) 
+	{
+		memset(buf, 0, BUF_SZ);
+		rcvd = read(sockfd, buf, BUF_SZ);
+		if (rcvd > 0) 
+		{
+			debug_log(INFO, __FILE__, "from server: %s\n", buf);
+		}
 	}
 }
 
@@ -102,6 +113,11 @@ int main(int argc, char** argv)
 	{
 		debug_log(INFO, __FILE__, "Successfully connected to server %s with port %d\n", s_addr, port);
 	}
-	//do client stuff
+	pthread_t t;
+	if ((pthread_create(&t, NULL, (void*) read_resp, NULL))) 
+	{
+		debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
+	}
+	//do client stuff -- should this be a thread?
 	work();
 }
