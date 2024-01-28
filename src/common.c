@@ -72,6 +72,7 @@ void debug_log(log_severity_t level, char const* filename, char* msg, ...)
         printf("Unable to open file %s: %s\n", cwd, strerror(errno));
     }
     //print to file
+	fprintf(out, "[ %s ] ", pre);
     if (!vfprintf(out, msg, copy))
     {
         printf("Error writing to file: %s", strerror(errno));

@@ -59,7 +59,8 @@ int32_t main(uint32_t argc, char** argv)
 	while (num_conn < MAXCONN) 
 	{
 		struct sockaddr_in client;
-		if ((connfds[num_conn] = accept(sockfd, (struct sockaddr*) &client, (socklen_t*) sizeof(client))) == -1) 
+		socklen_t client_len = sizeof(client);
+		if (!(connfds[num_conn] = accept(sockfd, (struct sockaddr*) &client, &client_len))) 
 		{
 			debug_log(WARN, __FILE__, "Failed to accept connection from client %d: %s", num_conn, strerror(errno));
 		}

@@ -51,7 +51,7 @@ static void read_resp(void)
 		rcvd = read(sockfd, buf, BUF_SZ);
 		if (rcvd > 0) 
 		{
-			debug_log(INFO, __FILE__, "from server: %s\n", buf);
+			debug_log(INFO, __FILE__, "from server: %s", buf);
 		}
 	}
 }
@@ -113,6 +113,7 @@ int main(int argc, char** argv)
 	{
 		debug_log(INFO, __FILE__, "Successfully connected to server %s with port %d\n", s_addr, port);
 	}
+	//have another thread read the return bytes from the server, so clients can see what other clients type
 	pthread_t t;
 	if ((pthread_create(&t, NULL, (void*) read_resp, NULL))) 
 	{
