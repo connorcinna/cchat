@@ -16,7 +16,7 @@ const char* log_color[5] =
     "\033[0m"     //reset to default 
 };
 
-char cwd[256];
+char cwd[1024];
 
 //TODO: this only works when running it from the main directory - maybe pass absolute path, or check
 //if the current directory has a log directory in it, which should be the case if running from root dir 
@@ -82,6 +82,14 @@ void debug_log(log_severity_t level, char const* filename, char* msg, ...)
 	fclose(out);
 	va_end(argp);
     va_end(copy);
+}
+
+void chat_print(char* msg, ...)
+{
+	set_print_color(DEFAULT);
+	va_list argp;
+	va_start(argp, msg);
+    vprintf(msg, argp);
 }
 
 void set_print_color(log_severity_t level) 

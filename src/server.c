@@ -18,9 +18,6 @@ static uint32_t connfds[MAXCONN];
 static uint32_t num_conn = 0;
 static struct sockaddr_in clients[MAXCONN];
 
-//in progress
-//TODO: when the server receives data from the client, have the host sendto() that packet to every client
-//so that each client can see what the others are saying
 int32_t main(uint32_t argc, char** argv)
 {
 	char* s_port;
@@ -134,7 +131,6 @@ static void work(void* arg)
 		{
 			debug_log(INFO, __FILE__, "client %d: %s\n", connfd, buf);
 		}
-		//need some way to globally access all connections from any thread
 		//then, here, sendto() every client
 		for (int i = 0; i < num_conn; ++i) 
 		{
