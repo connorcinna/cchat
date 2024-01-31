@@ -24,25 +24,32 @@ void usage(void)
 	exit(-1);
 }
 
-void work(void) 
+void work(char* name) 
 {
 	char buf[BUF_SZ];
 	for(;;)
 	{
 		memset(buf, 0, BUF_SZ);
 		ssize_t bytes_read = read(STDIN_FILENO, buf, BUF_SZ);
-		if (bytes_read > 255)
+		//format:
+		//name + ": " + msg 
+		//so the message size can be BUF_SZ - name size - 2
+		if (bytes_read > (BUF_SZ - (sizeof(name) + 2) ))
 		{
 			//TODO: split up the message into chunks
 			debug_log(INFO, __FILE__, "Message too long -- discarding\n");
 			continue;
 		}
-		buf[bytes_read] = '\0';
-		sendto(sockfd, (void*) buf, sizeof(buf), 0, (struct sockaddr*) &server, sizeof(server));
-		chat_print(buf);
+		char tmp[BUF_SZ];
+		strcat(tmp, name);
+		strcat(tmp, ": ");
+		strcat(tmp, buf);
+		//buf[bytes_read + sizeof(name) + 2] = '\0'; //i think this is done by default
+//		chat_print("%s: %s", name, buf);
+		debug_log(SEVERE, __FILE__, "%s: %s", name, buf);
+		sendto(sockfd, (void*) tmp, BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
 	}
 }
-//TODO: make this work for the current client too, not just the remote one
 void read_name(char* name) 
 {
 //	char name[BUF_SZ];
@@ -57,6 +64,7 @@ void read_name(char* name)
 	}
 	fclose(f);
 }
+
 //TODO: this doesnt seem to work yet
 void write_name(char* name) 
 {
@@ -78,11 +86,24 @@ static void read_resp(void* arg)
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
+		//the clients are only reading from the FD when they send a message themselves, thats why all the messages look queued behind 
+		//each other
 		rcvd = read(sockfd, buf, BUF_SZ);
-		if (rcvd > 0) 
+		if (rcvd > 0)
 		{
-			//debug_log(INFO, __FILE__, "from server: %s", buf);
-			chat_print("%s: %s", name, buf);
+			//extract the name of the other client
+			char* tmp = strdup(buf);
+			char* other_name = strtok(buf, ":");
+			strtok(tmp, ":");
+			if (other_name) 
+			{
+				chat_print("%s: %s", other_name, tmp);
+			//	printf("%s", buf);
+			}
+			else
+			{
+				debug_log(SEVERE, __FILE__, "Unable to parse name from client!");
+			}
 		}
 	}
 }
@@ -171,5 +192,5 @@ int main(int argc, char** argv)
 		debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
 	}
 	//do client stuff -- should this be a thread?
-	work();
+	work(name);
 }

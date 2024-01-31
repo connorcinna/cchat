@@ -76,7 +76,7 @@ int32_t main(uint32_t argc, char** argv)
 		{
 			//close the socket file descriptor
 			close(sockfd);
-			exit(-1);
+			exit(0);
 		}
 	}
 
