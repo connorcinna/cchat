@@ -15,12 +15,13 @@ struct sockaddr_in client;
 struct sockaddr_in server;
 static int port; 
 static int sockfd;
+static char* config_path;
 
 void usage(void)
 {
     printf("Usage: client -p [port] -s [server address] [-n] [name]\n");
     printf("Port and Address are required arguments. If you have not run this program before, a name must be provided as well.");
-    printf("If you HAVE run this program before, /etc/cchat/config contains your cached username.");
+    printf("If you HAVE run this program before, ~/.config/etc/config contains your cached username.");
 	exit(-1);
 }
 
@@ -50,31 +51,44 @@ void work(char* name)
 		sendto(sockfd, (void*) tmp, BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
 	}
 }
-void read_name(char* name) 
+char* read_name(char* name) 
 {
-//	char name[BUF_SZ];
-	FILE* f = fopen("/etc/cchat/config", "r");
+	FILE* f = fopen(config_path, "r");
 	if (!f)
 	{
-		debug_log(INFO, __FILE__, "/etc/cchat/config does not exist.\n");
+		debug_log(INFO, __FILE__, "%s does not exist.\n", config_path);
+		return name;
 	}
-	while (!feof(f))
+	char* line;
+	size_t len;
+	char* new_name;
+	if (getline(&line, &len, f) != -1) 
 	{
-		fread(name, BUF_SZ, 1, f);
+		new_name = strdup(line);
 	}
+	if (line) 
+	{
+		free(line);
+	}
+	return new_name;
 	fclose(f);
 }
 
-//TODO: this doesnt seem to work yet
 void write_name(char* name) 
 {
-	FILE* f = fopen("/etc/cchat/config", "w");
+	FILE* f = fopen(config_path, "w");
 	if (!f)
 	{
-		debug_log(WARN, __FILE__, "Unable to write username to file - failed to open file!");
+		debug_log(WARN, __FILE__, "Unable to write username to file: %s\n", strerror(errno));
 	}
-	fprintf(f, name);
-	debug_log(INFO, __FILE__, "Writing %s to cache\n");
+	if(fprintf(f, "%s", name) < 0)
+	{
+		debug_log(WARN, __FILE__, "Unable to write username to file : %s\n", strerror(errno));
+	}
+	else
+	{
+		debug_log(INFO, __FILE__, "Writing %s to cache\n", name);
+	}
 	fclose(f);
 }
 
@@ -86,30 +100,20 @@ static void read_resp(void* arg)
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
-		//the clients are only reading from the FD when they send a message themselves, thats why all the messages look queued behind 
-		//each other
 		rcvd = read(sockfd, buf, BUF_SZ);
 		if (rcvd > 0)
 		{
-			//extract the name of the other client
-			char* tmp = strdup(buf);
-			char* other_name = strtok(buf, ":");
-			strtok(tmp, ":");
-			if (other_name) 
-			{
-				chat_print("%s: %s", other_name, tmp);
-			//	printf("%s", buf);
-			}
-			else
-			{
-				debug_log(SEVERE, __FILE__, "Unable to parse name from client!");
-			}
+			chat_print("%s", buf);
 		}
 	}
 }
 
 int main(int argc, char** argv) 
 {
+	char* home = getenv("HOME");
+	strcat(home,  "/.config/cchat/config");
+	config_path = strdup(home);
+
 	char* s_port = NULL;
 	char* s_addr = NULL;
 	char* name = NULL;
@@ -152,7 +156,7 @@ int main(int argc, char** argv)
 	if (!name)
 	{
 		debug_log(WARN, __FILE__, "No name passed in -- checking cache\n");
-		read_name(name);
+		name = read_name(name);
 		if (!name)
 		{
 			debug_log(FATAL, __FILE__, "No name found in cache either -- unable to login\n");
@@ -160,11 +164,16 @@ int main(int argc, char** argv)
 		}
 		else 
 		{
-			debug_log(INFO, __FILE__, "Writing name to cache for later\n");
+			debug_log(INFO, __FILE__, "Writing %s to cache for later%d\n", name, __LINE__);
 			write_name(name);
 		}
 	}
-
+	else
+	{
+		debug_log(INFO, __FILE__, "Writing %s to cache for later%d\n", name, __LINE__);
+		write_name(name);
+	}
+	
     memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
