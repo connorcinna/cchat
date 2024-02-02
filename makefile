@@ -3,14 +3,15 @@ CLFAGS=-I. -g
 SRCDIR=$(CURDIR)/src
 BUILDDIR=$(CURDIR)/bin
 LIBDIR=$(CURDIR)/lib
+LIBS=-lncurses
 LOGDIR=$(CURDIR)/log
 
 dirs: 
 	mkdir -p $(BUILDDIR) $(LIBDIR) $(LOGDIR)
 server: $(SRCDIR)/server.c $(SRCDIR)/server.h $(SRCDIR)/common.h
-	$(CC) -o $(BUILDDIR)/server $(SRCDIR)/server.c $(LIBDIR)/libcommon.o -pthread
+	$(CC) -o $(BUILDDIR)/server $(SRCDIR)/server.c $(LIBDIR)/libcommon.o -pthread $(LIBS)
 client: $(SRCDIR)/client.c 
-	$(CC) -o $(BUILDDIR)/client $(SRCDIR)/client.c $(LIBDIR)/libcommon.o -pthread
+	$(CC) -o $(BUILDDIR)/client $(SRCDIR)/client.c $(LIBDIR)/libcommon.o -pthread $(LIBS)
 common: $(SRCDIR)/common.c $(SRCDIR)/common.h
 	$(CC) -c -o $(LIBDIR)/libcommon.o $(SRCDIR)/common.c
 

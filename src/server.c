@@ -15,13 +15,12 @@ static uint32_t port; //does not get changed anywhere outside of initialization
 					  //realistically need a better way to pass this around
 //should protect these with a mutex
 static uint32_t connfds[MAXCONN];
-static uint32_t num_conn = 0;
 static struct sockaddr_in clients[MAXCONN];
+static uint32_t num_conn = 0;
 
 int32_t main(uint32_t argc, char** argv)
 {
 	char* s_port;
-	//struct sockaddr_in client_addr;
 	uint32_t sockfd;
 
 	uint32_t arg;
@@ -52,7 +51,6 @@ int32_t main(uint32_t argc, char** argv)
 
 	//bind to a socket and listen to it for incoming connections
 	sockfd = listen_server(port);
-
 	while (num_conn < MAXCONN) 
 	{
 		struct sockaddr_in client;
@@ -72,14 +70,12 @@ int32_t main(uint32_t argc, char** argv)
 
 	for (;;) 
 	{
-		if (fgetc(stdin) == 'q')
+		if (getchar() == 'q')
 		{
-			//close the socket file descriptor
 			close(sockfd);
 			exit(0);
 		}
 	}
-
 }
 
 void usage()
@@ -117,7 +113,8 @@ uint32_t listen_server(uint32_t port)
 	debug_log(INFO, __FILE__, "Server listening on port %d\n", port);
 	return sockfd;
 }
-
+//this thread gets initialized for each new connection. it's purpose is to receive data from a client on connfd and 
+//then send it to 
 static void work(void* arg)
 {
 	uint32_t connfd = *(uint32_t*) arg;
@@ -136,9 +133,12 @@ static void work(void* arg)
 		{
 			if (connfds[i] == connfd) //don't resend the clients message back to itself
 			{
+				debug_log(INFO, __FILE__, "Skipping sending message to client %d\n", connfds[i]);
 				continue;
 			}
-			sendto(connfds[i], (void*) buf, sizeof(buf), 0, (struct sockaddr*) &clients[i], sizeof(clients[i]));
+			//can i sendto on a client other than the current connfd?
+			debug_log(INFO, __FILE__, "Sending to client %d\n", connfds[i]);
+			sendto(connfds[i], (void*) buf, rcvd, 0, (struct sockaddr*) &clients[i], sizeof(clients[i]));
 		}
 		memset(buf, 0, BUF_SZ);
 		if (strncmp("exit", buf, 4) == 0)

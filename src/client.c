@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <ncurses.h>
 #include "common.h"
 
 struct sockaddr_in client;
@@ -23,6 +24,41 @@ void usage(void)
     printf("Port and Address are required arguments. If you have not run this program before, a name must be provided as well.");
     printf("If you HAVE run this program before, ~/.config/etc/config contains your cached username.");
 	exit(-1);
+}
+
+void initialize(char* s_addr, char* s_port) 
+{
+	initscr();
+	nocbreak();
+	noecho();
+	scrollok(stdscr, TRUE);
+	if (has_colors())
+	{
+		start_color();
+		init_pair(1, COLOR_BLACK, COLOR_GREEN);
+	}
+	wbkgd(stdscr, COLOR_PAIR(1));
+	memset(&server, 0, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_port = htons(port);
+    server.sin_addr.s_addr = inet_addr(s_addr);
+
+    if (!(sockfd = socket(AF_INET, SOCK_STREAM, 0))) 
+    {
+        debug_log(FATAL, __FILE__, "Unable to open socket: %s\n", strerror(errno));
+        exit(-1);
+    }
+	debug_log(INFO, __FILE__, "Attempting to connect to server: %s:%s\n", s_addr, s_port);
+    if (connect(sockfd, (struct sockaddr*) &server, sizeof(server)))
+    {
+		debug_log(FATAL, __FILE__, "Unable to connect to server: %s\n", strerror(errno));
+        exit(-1);
+    }
+	else 
+	{
+		debug_log(INFO, __FILE__, "Successfully connected to server %s with port %d\n", s_addr, port);
+	}
+	refresh();
 }
 
 void work(char* name) 
@@ -45,9 +81,10 @@ void work(char* name)
 		strcat(tmp, name);
 		strcat(tmp, ": ");
 		strcat(tmp, buf);
-		//buf[bytes_read + sizeof(name) + 2] = '\0'; //i think this is done by default
-//		chat_print("%s: %s", name, buf);
-		debug_log(SEVERE, __FILE__, "%s: %s", name, buf);
+		//locally, print out our own information
+		wprintw(stdscr,"%s: %s\n", name, buf);
+		refresh();
+		//send "name: msg" back to server
 		sendto(sockfd, (void*) tmp, BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
 	}
 }
@@ -92,19 +129,16 @@ void write_name(char* name)
 	fclose(f);
 }
 
-static void read_resp(void* arg) 
+static void read_resp() 
 {
 	char buf[BUF_SZ];
-	char* name = (char*) arg;
 	ssize_t rcvd;
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
 		rcvd = read(sockfd, buf, BUF_SZ);
-		if (rcvd > 0)
-		{
-			chat_print("%s", buf);
-		}
+		wprintw(stdscr,"%s\n", buf);
+		refresh();
 	}
 }
 
@@ -173,33 +207,15 @@ int main(int argc, char** argv)
 		debug_log(INFO, __FILE__, "Writing %s to cache for later%d\n", name, __LINE__);
 		write_name(name);
 	}
-	
-    memset(&server, 0, sizeof(server));
-    server.sin_family = AF_INET;
-    server.sin_port = htons(port);
-    server.sin_addr.s_addr = inet_addr(s_addr);
-
-    if (!(sockfd = socket(AF_INET, SOCK_STREAM, 0))) 
-    {
-        debug_log(FATAL, __FILE__, "Unable to open socket: %s\n", strerror(errno));
-        exit(-1);
-    }
-	debug_log(INFO, __FILE__, "Attempting to connect to server: %s:%s\n", s_addr, s_port);
-    if (connect(sockfd, (struct sockaddr*) &server, sizeof(server)))
-    {
-		debug_log(FATAL, __FILE__, "Unable to connect to server: %s\n", strerror(errno));
-        exit(-1);
-    }
-	else 
-	{
-		debug_log(INFO, __FILE__, "Successfully connected to server %s with port %d\n", s_addr, port);
-	}
+	//get stuff set up
+	initialize(s_addr, s_port);
+	//do client stuff -- should this be a thread?
 	//have another thread read the return bytes from the server, so clients can see what other clients type
 	pthread_t t;
-	if ((pthread_create(&t, NULL, (void*) read_resp, (void*) name))) 
+	if ((pthread_create(&t, NULL, (void*) read_resp, NULL))) 
 	{
 		debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
 	}
-	//do client stuff -- should this be a thread?
 	work(name);
+	endwin();
 }

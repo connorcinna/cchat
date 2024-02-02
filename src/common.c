@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <stdlib.h>
+#include <ncurses.h>
 #include "common.h"
 
 const char* log_color[5] = 
@@ -61,7 +62,7 @@ void debug_log(log_severity_t level, char const* filename, char* msg, ...)
     va_copy(copy, argp);
     //print timestamp and file this came from 
 	char* pre = log_prefix(filename);
-	printf("[ %s ] ", pre);
+	printw("[ %s ] ", pre);
 	//print formatted string
     vprintf(msg, argp);
     //reset print color back to default
@@ -69,13 +70,13 @@ void debug_log(log_severity_t level, char const* filename, char* msg, ...)
     //open cwd, write the same message
 	if (!(out = fopen(cwd, "a"))) 
     {
-        printf("Unable to open file %s: %s\n", cwd, strerror(errno));
+        printw("Unable to open file %s: %s\n", cwd, strerror(errno));
     }
     //print to file
 	fprintf(out, "[ %s ] ", pre);
     if (!vfprintf(out, msg, copy))
     {
-        printf("Error writing to file: %s", strerror(errno));
+        printw("Error writing to file: %s", strerror(errno));
     }
     //free resources
 	free(pre);
@@ -90,6 +91,7 @@ void chat_print(char* msg, ...)
 	va_list argp;
 	va_start(argp, msg);
     vprintf(msg, argp);
+	//printw(msg, argp);
 }
 
 void set_print_color(log_severity_t level) 
