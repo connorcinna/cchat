@@ -14,6 +14,7 @@
 
 struct sockaddr_in client;
 struct sockaddr_in server;
+WINDOW* win;
 static int port; 
 static int sockfd;
 static char* config_path;
@@ -29,15 +30,19 @@ void usage(void)
 void initialize(char* s_addr, char* s_port) 
 {
 	initscr();
+	uint32_t rows, cols;
+	getmaxyx(stdscr, rows, cols);
+	debug_log(INFO, __FILE__, "rows: %d cols: %d\n", rows, cols);
+	win	= newwin(rows, cols, 0, 0);
 	nocbreak();
 	noecho();
-	scrollok(stdscr, TRUE);
+	scrollok(win, TRUE);
 	if (has_colors())
 	{
 		start_color();
-		init_pair(1, COLOR_BLACK, COLOR_GREEN);
+		init_pair(1, COLOR_GREEN, COLOR_BLACK);
 	}
-	wbkgd(stdscr, COLOR_PAIR(1));
+	wbkgd(win, COLOR_PAIR(1));
 	memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
@@ -48,17 +53,12 @@ void initialize(char* s_addr, char* s_port)
         debug_log(FATAL, __FILE__, "Unable to open socket: %s\n", strerror(errno));
         exit(-1);
     }
-	debug_log(INFO, __FILE__, "Attempting to connect to server: %s:%s\n", s_addr, s_port);
     if (connect(sockfd, (struct sockaddr*) &server, sizeof(server)))
     {
 		debug_log(FATAL, __FILE__, "Unable to connect to server: %s\n", strerror(errno));
         exit(-1);
     }
-	else 
-	{
-		debug_log(INFO, __FILE__, "Successfully connected to server %s with port %d\n", s_addr, port);
-	}
-	refresh();
+	wrefresh(win);
 }
 
 void work(char* name) 
@@ -68,6 +68,8 @@ void work(char* name)
 	{
 		memset(buf, 0, BUF_SZ);
 		ssize_t bytes_read = read(STDIN_FILENO, buf, BUF_SZ);
+		wprintw(win, "bytes read in work: %d\n", bytes_read);
+		wrefresh(win);
 		//format:
 		//name + ": " + msg 
 		//so the message size can be BUF_SZ - name size - 2
@@ -81,9 +83,8 @@ void work(char* name)
 		strcat(tmp, name);
 		strcat(tmp, ": ");
 		strcat(tmp, buf);
-		//locally, print out our own information
-		wprintw(stdscr,"%s: %s\n", name, buf);
-		refresh();
+		wprintw(win, "%s\n", tmp);
+		wrefresh(win);
 		//send "name: msg" back to server
 		sendto(sockfd, (void*) tmp, BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
 	}
@@ -118,7 +119,7 @@ void write_name(char* name)
 	{
 		debug_log(WARN, __FILE__, "Unable to write username to file: %s\n", strerror(errno));
 	}
-	if(fprintf(f, "%s", name) < 0)
+	if(fprintf(f, "%s\n", name) < 0)
 	{
 		debug_log(WARN, __FILE__, "Unable to write username to file : %s\n", strerror(errno));
 	}
@@ -132,13 +133,13 @@ void write_name(char* name)
 static void read_resp() 
 {
 	char buf[BUF_SZ];
-	ssize_t rcvd;
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
-		rcvd = read(sockfd, buf, BUF_SZ);
-		wprintw(stdscr,"%s\n", buf);
-		refresh();
+		ssize_t rcvd = read(sockfd, buf, BUF_SZ);
+		wprintw(win, "bytes read in read_resp: %d\n", rcvd);
+		wprintw(win,"%s\n", buf);
+		wrefresh(win);
 	}
 }
 
@@ -198,13 +199,13 @@ int main(int argc, char** argv)
 		}
 		else 
 		{
-			debug_log(INFO, __FILE__, "Writing %s to cache for later%d\n", name, __LINE__);
+			debug_log(INFO, __FILE__, "Writing %s to cache for later\n", name);
 			write_name(name);
 		}
 	}
 	else
 	{
-		debug_log(INFO, __FILE__, "Writing %s to cache for later%d\n", name, __LINE__);
+		debug_log(INFO, __FILE__, "Writing %s to cache for later\n", name);
 		write_name(name);
 	}
 	//get stuff set up
