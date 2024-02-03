@@ -12,13 +12,28 @@
 #include <ncurses.h>
 #include "common.h"
 
+//this client
 struct sockaddr_in client;
+//the server
 struct sockaddr_in server;
-WINDOW* win;
+//the main window where chat between clients is displayed
+WINDOW* win_main;
+//side window where all of the client's names will appear
+WINDOW* win_clients;
+//small bottom window where the user will type their message
+WINDOW* win_msg;
+//the port to connect to the server on
 static int port; 
+//the socket we are connect()'ed to
 static int sockfd;
+//path to config file -- currently only holds a cached name if a user has logged in before
 static char* config_path;
+//the maximum size of the terminal
+uint32_t max_y, max_x;
+//the current row that the client prints to -- has to be global
+uint32_t row = 1;
 
+//print information regarding how to start the program from commandline and exit
 void usage(void)
 {
     printf("Usage: client -p [port] -s [server address] [-n] [name]\n");
@@ -26,23 +41,40 @@ void usage(void)
     printf("If you HAVE run this program before, ~/.config/etc/config contains your cached username.");
 	exit(-1);
 }
-
-void initialize(char* s_addr, char* s_port) 
+//busy work for setting up structs or initializing variables
+//TODO: do some fancy math to figure out how big these windows need to be instead of using magic numbers
+//TODO: currently, user can't see what they're typing. the cursor moves to the win_msg window, but characters don't show up as they type
+//it can show up with raw(), but that fucks up how often it prints to the screen
+void init_ncurses(void) 
 {
 	initscr();
-	uint32_t rows, cols;
-	getmaxyx(stdscr, rows, cols);
-	debug_log(INFO, __FILE__, "rows: %d cols: %d\n", rows, cols);
-	win	= newwin(rows, cols, 0, 0);
+	getmaxyx(stdscr, max_y, max_x);
+	win_clients = newwin(max_y, 10, 0, 0);
+	win_msg = newwin(5, max_x - 10, max_y - 5, 10);
+	win_main = newwin(max_y-5, max_x-10, 0, 10);
+	box(win_clients, '|', '-');
+	box(win_msg, '|', '-');
+	box(win_main, '|', '-');
 	nocbreak();
-	noecho();
-	scrollok(win, TRUE);
+	scrollok(win_main, TRUE);
+	scrollok(win_msg, TRUE);
+	scrollok(win_clients, TRUE);
 	if (has_colors())
 	{
 		start_color();
 		init_pair(1, COLOR_GREEN, COLOR_BLACK);
 	}
-	wbkgd(win, COLOR_PAIR(1));
+	wbkgd(win_main, COLOR_PAIR(1));
+	wbkgd(win_clients, COLOR_PAIR(1));
+	wbkgd(win_msg, COLOR_PAIR(1));
+	wmove(win_msg, 1, 1);
+	wrefresh(win_main);
+	wrefresh(win_clients);
+	wrefresh(win_msg);
+}
+void init(char* s_addr, char* s_port) 
+{
+	init_ncurses();
 	memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
@@ -58,18 +90,17 @@ void initialize(char* s_addr, char* s_port)
 		debug_log(FATAL, __FILE__, "Unable to connect to server: %s\n", strerror(errno));
         exit(-1);
     }
-	wrefresh(win);
+	
 }
-
 void work(char* name) 
 {
 	char buf[BUF_SZ];
+	char tmp[BUF_SZ];
 	for(;;)
 	{
 		memset(buf, 0, BUF_SZ);
 		ssize_t bytes_read = read(STDIN_FILENO, buf, BUF_SZ);
-		wprintw(win, "bytes read in work: %d\n", bytes_read);
-		wrefresh(win);
+		wrefresh(win_main);
 		//format:
 		//name + ": " + msg 
 		//so the message size can be BUF_SZ - name size - 2
@@ -79,14 +110,21 @@ void work(char* name)
 			debug_log(INFO, __FILE__, "Message too long -- discarding\n");
 			continue;
 		}
-		char tmp[BUF_SZ];
+		memset(tmp, 0, BUF_SZ);
 		strcat(tmp, name);
 		strcat(tmp, ": ");
 		strcat(tmp, buf);
-		wprintw(win, "%s\n", tmp);
-		wrefresh(win);
+		wmove(win_main, row, 1);
+		wprintw(win_main, "%s", tmp);
+		wmove(win_msg, 1, 1);
+		wrefresh(win_main);
+		wrefresh(win_msg);
 		//send "name: msg" back to server
 		sendto(sockfd, (void*) tmp, BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
+		if (row <= max_x)
+		{
+			++row;
+		}
 	}
 }
 char* read_name(char* name) 
@@ -119,7 +157,7 @@ void write_name(char* name)
 	{
 		debug_log(WARN, __FILE__, "Unable to write username to file: %s\n", strerror(errno));
 	}
-	if(fprintf(f, "%s\n", name) < 0)
+	if(fprintf(f, "%s", name) < 0)
 	{
 		debug_log(WARN, __FILE__, "Unable to write username to file : %s\n", strerror(errno));
 	}
@@ -133,13 +171,35 @@ void write_name(char* name)
 static void read_resp() 
 {
 	char buf[BUF_SZ];
+	char* peers[MAX_CONN];
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
 		ssize_t rcvd = read(sockfd, buf, BUF_SZ);
-		wprintw(win, "bytes read in read_resp: %d\n", rcvd);
-		wprintw(win,"%s\n", buf);
-		wrefresh(win);
+		char* tmp = strdup(buf);
+		strtok(tmp, ":");
+		debug_log(INFO, __FILE__, "%s\n", tmp);
+		uint32_t index = 0;
+		for (int i = 0; i < MAX_CONN; ++i) 
+		{
+			if (peers[i] == tmp)
+			{
+				index = i;
+			}
+		}
+		if (!index)
+		{
+			peers[index] = tmp;	
+			wprintw(win_clients, "%s\n", tmp);
+			wrefresh(win_clients);
+		}
+		wmove(win_main, row, 1);
+		wprintw(win_main,"%s", buf);
+		wrefresh(win_main);
+		if (row <= max_x)
+		{
+			++row;
+		}
 	}
 }
 
@@ -199,7 +259,6 @@ int main(int argc, char** argv)
 		}
 		else 
 		{
-			debug_log(INFO, __FILE__, "Writing %s to cache for later\n", name);
 			write_name(name);
 		}
 	}
@@ -209,14 +268,14 @@ int main(int argc, char** argv)
 		write_name(name);
 	}
 	//get stuff set up
-	initialize(s_addr, s_port);
-	//do client stuff -- should this be a thread?
+	init(s_addr, s_port);
 	//have another thread read the return bytes from the server, so clients can see what other clients type
 	pthread_t t;
 	if ((pthread_create(&t, NULL, (void*) read_resp, NULL))) 
 	{
 		debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
 	}
+	//do client stuff 
 	work(name);
 	endwin();
 }

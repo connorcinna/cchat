@@ -11,11 +11,13 @@
 #include "server.h"
 #include "common.h"
 
-static uint32_t port; //does not get changed anywhere outside of initialization
-					  //realistically need a better way to pass this around
-//should protect these with a mutex
-static uint32_t connfds[MAXCONN];
-static struct sockaddr_in clients[MAXCONN];
+//the server port
+static uint32_t port; 
+//all of the file descriptors open by the server
+static uint32_t connfds[MAX_CONN];
+//all of the clients the server knows about
+static struct sockaddr_in clients[MAX_CONN];
+//the total number of connections right now
 static uint32_t num_conn = 0;
 
 int32_t main(uint32_t argc, char** argv)
@@ -51,7 +53,7 @@ int32_t main(uint32_t argc, char** argv)
 
 	//bind to a socket and listen to it for incoming connections
 	sockfd = listen_server(port);
-	while (num_conn < MAXCONN) 
+	while (num_conn < MAX_CONN) 
 	{
 		struct sockaddr_in client;
 		socklen_t client_len = sizeof(client);
@@ -59,7 +61,7 @@ int32_t main(uint32_t argc, char** argv)
 		{
 			debug_log(WARN, __FILE__, "Failed to accept connection from client %d: %s", num_conn, strerror(errno));
 		}
-		debug_log(INFO, __FILE__, "Client %d connected on %d\n", num_conn, connfds[num_conn]);
+		debug_log(INFO, __FILE__, "New client connected on fd: %d\n", connfds[num_conn]);
 		pthread_t t;
 		if ((pthread_create(&t, NULL, (void*) work, (void*) &connfds[num_conn]))) 
 		{
@@ -105,7 +107,7 @@ uint32_t listen_server(uint32_t port)
 		debug_log(FATAL, __FILE__, "Server failed to bind to socket %d\n", sockfd);
 		exit(-1);
 	}
-	if (listen(sockfd, MAXCONN) != 0)
+	if (listen(sockfd, MAX_CONN) != 0)
 	{
 		debug_log(FATAL, __FILE__, "Server failed to listen on socket %d\n", sockfd);
 		exit(-1);
@@ -115,7 +117,7 @@ uint32_t listen_server(uint32_t port)
 }
 //this thread gets initialized for each new connection. it's purpose is to receive data from a client on connfd and 
 //then send it to 
-static void work(void* arg)
+void work(void* arg)
 {
 	uint32_t connfd = *(uint32_t*) arg;
 	char buf[BUF_SZ];
@@ -136,7 +138,6 @@ static void work(void* arg)
 				debug_log(INFO, __FILE__, "Skipping sending message to client %d\n", connfds[i]);
 				continue;
 			}
-			//can i sendto on a client other than the current connfd?
 			debug_log(INFO, __FILE__, "Sending to client %d\n", connfds[i]);
 			sendto(connfds[i], (void*) buf, rcvd, 0, (struct sockaddr*) &clients[i], sizeof(clients[i]));
 		}
@@ -144,14 +145,18 @@ static void work(void* arg)
 		if (strncmp("exit", buf, 4) == 0)
 		{
 			debug_log(WARN, __FILE__, "Disconnecting client from server\n");
+			--num_conn;
+			memset(buf, 0, BUF_SZ);
 			close(connfd);
-			break;
+			return;
 		}
 		else if (rcvd == 0)
 		{
 			debug_log(WARN, __FILE__, "Client disconnect received -- closing connection\n");
+			--num_conn;
+			memset(buf, 0, BUF_SZ);
 			close(connfd);
-			break;
+			return;
 		}
 	}
 }

@@ -1,7 +1,7 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#define MAXCONN 10
+#define MAX_CONN 10
 #define BUF_SZ 256
 //TODO: figure out a way to string these macros together 
 //#define LOG_INFO __FILE__ ## __FUNCTION__ ## __LINE__
