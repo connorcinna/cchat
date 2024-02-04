@@ -135,10 +135,10 @@ void work(void* arg)
 		{
 			if (connfds[i] == connfd) //don't resend the clients message back to itself
 			{
-				debug_log(INFO, __FILE__, "Skipping sending message to client %d\n", connfds[i]);
+//				debug_log(INFO, __FILE__, "Skipping sending message to client %d\n", connfds[i]);
 				continue;
 			}
-			debug_log(INFO, __FILE__, "Sending to client %d\n", connfds[i]);
+//			debug_log(INFO, __FILE__, "Sending to client %d\n", connfds[i]);
 			sendto(connfds[i], (void*) buf, rcvd, 0, (struct sockaddr*) &clients[i], sizeof(clients[i]));
 		}
 		memset(buf, 0, BUF_SZ);

@@ -6,6 +6,8 @@
 //TODO: figure out a way to string these macros together 
 //#define LOG_INFO __FILE__ ## __FUNCTION__ ## __LINE__
 
+#define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
+
 enum log_severity
 {
     INFO,

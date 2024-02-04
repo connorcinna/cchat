@@ -23,15 +23,23 @@ WINDOW* win_clients;
 //small bottom window where the user will type their message
 WINDOW* win_msg;
 //the port to connect to the server on
-static int port; 
+static uint16_t port; 
 //the socket we are connect()'ed to
-static int sockfd;
+static uint32_t sockfd;
 //path to config file -- currently only holds a cached name if a user has logged in before
 static char* config_path;
-//the maximum size of the terminal
+//dimensions of the entire terminal screen
 uint32_t max_y, max_x;
+//dimensions of the main chat window
+uint32_t main_y, main_x = 0;
+//dimensions of the message window
+uint32_t msg_y, msg_x = 0;
+//dimensions of the client window
+uint32_t clients_y, clients_x = 0;
 //the current row that the client prints to -- has to be global
 uint32_t row = 1;
+//a list of peers that the client knows about -- used for populating the side window
+char* peers[MAX_CONN];
 
 //print information regarding how to start the program from commandline and exit
 void usage(void)
@@ -49,28 +57,48 @@ void init_ncurses(void)
 {
 	initscr();
 	getmaxyx(stdscr, max_y, max_x);
-	win_clients = newwin(max_y, 10, 0, 0);
-	win_msg = newwin(5, max_x - 10, max_y - 5, 10);
-	win_main = newwin(max_y-5, max_x-10, 0, 10);
-	box(win_clients, '|', '-');
-	box(win_msg, '|', '-');
+
+	win_main = newwin(max_y - 5, max_x - 16, 0, 16);
+	win_msg = newwin(5, max_x - 16, max_y - 5, 16);
+	win_clients = newwin(max_y, 16, 0, 0);
+
+	getmaxyx(win_main, main_y, main_x);
+	getmaxyx(win_msg, msg_y, msg_x);
+	getmaxyx(win_clients, clients_y, clients_x);
+
 	box(win_main, '|', '-');
-	nocbreak();
+	box(win_msg, '|', '-');
+	box(win_clients, '|', '-');
+
 	scrollok(win_main, TRUE);
 	scrollok(win_msg, TRUE);
 	scrollok(win_clients, TRUE);
+
+	wmove(win_main, 0, (main_x / 2));
+	wprintw(win_main, "CCHAT");
+
+	wmove(win_msg, 0, (msg_x / 8));
+	wprintw(win_msg, "Type a message");
+
+	wmove(win_clients, 0, (clients_x / 2));
+	wprintw(win_clients, "h");
+	
+	nocbreak();
+
 	if (has_colors())
 	{
 		start_color();
 		init_pair(1, COLOR_GREEN, COLOR_BLACK);
 	}
 	wbkgd(win_main, COLOR_PAIR(1));
-	wbkgd(win_clients, COLOR_PAIR(1));
 	wbkgd(win_msg, COLOR_PAIR(1));
-	wmove(win_msg, 1, 1);
+	wbkgd(win_clients, COLOR_PAIR(1));
+
 	wrefresh(win_main);
 	wrefresh(win_clients);
 	wrefresh(win_msg);
+
+	wmove(win_msg, 1, 1);
 }
 void init(char* s_addr, char* s_port) 
 {
@@ -117,6 +145,10 @@ void work(char* name)
 		wmove(win_main, row, 1);
 		wprintw(win_main, "%s", tmp);
 		wmove(win_msg, 1, 1);
+
+		box(win_msg, '|', '-');
+		box(win_main, '|', '-');
+
 		wrefresh(win_main);
 		wrefresh(win_msg);
 		//send "name: msg" back to server
@@ -167,11 +199,19 @@ void write_name(char* name)
 	}
 	fclose(f);
 }
-
-static void read_resp() 
+//TODO: clean this mess up, make a generic refresh function(?) for whenever we call the combination move, print, box, refresh functions
+static void read_resp(void) 
 {
 	char buf[BUF_SZ];
-	char* peers[MAX_CONN];
+	uint32_t peer_count = 1; //we have at least one peer - ourself
+	wmove(win_clients, 0, (clients_x / 2));
+	wprintw(win_clients, "ROOM");
+
+//	wmove(win_clients, 1, 1);
+//	wprintw(win_clients, "%s\n", peers[0]);
+
+//	box(win_clients, '|', '-');
+	wrefresh(win_clients);
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
@@ -179,22 +219,32 @@ static void read_resp()
 		char* tmp = strdup(buf);
 		strtok(tmp, ":");
 		debug_log(INFO, __FILE__, "%s\n", tmp);
-		uint32_t index = 0;
-		for (int i = 0; i < MAX_CONN; ++i) 
+		//iterate through our list of peers to see if we already know about this peer. if we do, break and continue.
+		//if we don't, set the flag for the peer to be added to the list
+		int32_t flag = 0;
+		for (int i = 0; i < peer_count; ++i) 
 		{
-			if (peers[i] == tmp)
+			if (!strcmp(peers[i], tmp))
 			{
-				index = i;
+				break;
+			}
+			if (i == peer_count-1)
+			{
+				flag = 1;
 			}
 		}
-		if (!index)
+		if (flag)
 		{
-			peers[index] = tmp;	
+			peers[peer_count] = tmp;
+			++peer_count;
+			wmove(win_clients, peer_count, 1);
 			wprintw(win_clients, "%s\n", tmp);
+			box(win_clients, '|', '-');
 			wrefresh(win_clients);
 		}
 		wmove(win_main, row, 1);
-		wprintw(win_main,"%s", buf);
+		wprintw(win_main,"%s\n", buf);
+		box(win_main, '|', '-');
 		wrefresh(win_main);
 		if (row <= max_x)
 		{
@@ -230,7 +280,6 @@ int main(int argc, char** argv)
 				name = optarg;
 				debug_log(INFO, __FILE__, "Setting name to %s\n", name);
 			default: 
-
 		}
 	}
     if (!s_port) 
@@ -267,6 +316,7 @@ int main(int argc, char** argv)
 		debug_log(INFO, __FILE__, "Writing %s to cache for later\n", name);
 		write_name(name);
 	}
+	peers[0] = name;
 	//get stuff set up
 	init(s_addr, s_port);
 	//have another thread read the return bytes from the server, so clients can see what other clients type

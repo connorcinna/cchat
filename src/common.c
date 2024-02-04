@@ -62,9 +62,9 @@ void debug_log(log_severity_t level, char const* filename, char* msg, ...)
     va_copy(copy, argp);
     //print timestamp and file this came from 
 	char* pre = log_prefix(filename);
-	printw("[ %s ] ", pre);
+//	printw("[ %s ] ", pre);
 	//print formatted string
-    vprintf(msg, argp);
+//    vprintf(msg, argp);
     //reset print color back to default
     set_print_color(DEFAULT);
     //open cwd, write the same message
