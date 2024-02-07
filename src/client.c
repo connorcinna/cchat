@@ -74,16 +74,20 @@ void init_ncurses(void)
 	scrollok(win_msg, TRUE);
 	scrollok(win_clients, TRUE);
 
+	wsetscrreg(win_main, 1, main_y-2);
+	idlok(win_main, TRUE);
+	nocbreak();
+
 	wmove(win_main, 0, (main_x / 2));
 	wprintw(win_main, "CCHAT");
 
 	wmove(win_msg, 0, (msg_x / 8));
 	wprintw(win_msg, "Type a message");
 
-	wmove(win_clients, 0, (clients_x / 2));
-	wprintw(win_clients, "h");
+//	wmove(win_clients, 0, (clients_x / 2));
+//	wprintw(win_clients, "ROOM");
 	
-	nocbreak();
+	wmove(win_msg, 1, 1);
 
 	if (has_colors())
 	{
@@ -94,11 +98,11 @@ void init_ncurses(void)
 	wbkgd(win_msg, COLOR_PAIR(1));
 	wbkgd(win_clients, COLOR_PAIR(1));
 
+
 	wrefresh(win_main);
 	wrefresh(win_clients);
 	wrefresh(win_msg);
 
-	wmove(win_msg, 1, 1);
 }
 void init(char* s_addr, char* s_port) 
 {
@@ -118,17 +122,28 @@ void init(char* s_addr, char* s_port)
 		debug_log(FATAL, __FILE__, "Unable to connect to server: %s\n", strerror(errno));
         exit(-1);
     }
-	
+	//set the first peer in the client list -- ourself
+	wmove(win_clients, 1, 1);
+	wprintw(win_clients, "%s\n", peers[0]);	
+	//refresh 
+	wmove(win_clients, 0, (clients_x / 2));
+	wprintw(win_clients, "ROOM");
+
+	wrefresh(win_clients);
 }
+//TODO; have a way to initialize ROOM client list in one spot. should be easy but i cant think
 void work(char* name) 
 {
 	char buf[BUF_SZ];
 	char tmp[BUF_SZ];
+	wmove(win_clients, 0, ((clients_x / 2)-1));
+	wprintw(win_clients, "ROOM");
+	wrefresh(win_clients);
 	for(;;)
 	{
 		memset(buf, 0, BUF_SZ);
 		ssize_t bytes_read = read(STDIN_FILENO, buf, BUF_SZ);
-		wrefresh(win_main);
+		//wrefresh(win_main);
 		//format:
 		//name + ": " + msg 
 		//so the message size can be BUF_SZ - name size - 2
@@ -142,18 +157,26 @@ void work(char* name)
 		strcat(tmp, name);
 		strcat(tmp, ": ");
 		strcat(tmp, buf);
+
+		//put the cursor back to the current row it's on so that output can scroll
 		wmove(win_main, row, 1);
 		wprintw(win_main, "%s", tmp);
-		wmove(win_msg, 1, 1);
 
 		box(win_msg, ACS_VLINE, ACS_HLINE);
 		box(win_main, ACS_VLINE, ACS_HLINE);
+
+		wmove(win_main, 0, (main_x / 2));
+		wprintw(win_main, "CCHAT");
+
+		wmove(win_msg, 0, (msg_x / 8));
+		wprintw(win_msg, "Type a message");
+		wmove(win_msg, 1, 1);
 
 		wrefresh(win_main);
 		wrefresh(win_msg);
 		//send "name: msg" back to server
 		sendto(sockfd, (void*) tmp, BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
-		if (row <= max_x)
+		if (row < main_y - 2) //minus 2 for the size of the border
 		{
 			++row;
 		}
@@ -204,13 +227,14 @@ static void read_resp(void)
 {
 	char buf[BUF_SZ];
 	uint32_t peer_count = 1; //we have at least one peer - ourself
+						 
 	wmove(win_clients, 0, ((clients_x / 2)-1));
 	wprintw(win_clients, "ROOM");
 
 //	wmove(win_clients, 1, 1);
 //	wprintw(win_clients, "%s\n", peers[0]);
 
-//	box(win_clients, ACS_VLINE, ACS_HLINE);
+	box(win_clients, ACS_VLINE, ACS_HLINE);
 	wrefresh(win_clients);
 	for(;;) 
 	{
@@ -218,7 +242,7 @@ static void read_resp(void)
 		ssize_t rcvd = read(sockfd, buf, BUF_SZ);
 		char* tmp = strdup(buf);
 		strtok(tmp, ":");
-		debug_log(INFO, __FILE__, "%s\n", tmp);
+		debug_log(INFO, __FILE__, "%s", tmp);
 		//iterate through our list of peers to see if we already know about this peer. if we do, break and continue.
 		//if we don't, set the flag for the peer to be added to the list
 		int32_t flag = 0;
@@ -240,13 +264,19 @@ static void read_resp(void)
 			wmove(win_clients, peer_count, 1);
 			wprintw(win_clients, "%s\n", tmp);
 			box(win_clients, ACS_VLINE, ACS_HLINE);
+			wmove(win_clients, 0, ((clients_x / 2)-1));
+			wprintw(win_clients, "ROOM");
 			wrefresh(win_clients);
 		}
 		wmove(win_main, row, 1);
 		wprintw(win_main,"%s\n", buf);
+
 		box(win_main, ACS_VLINE, ACS_HLINE);
+		wmove(win_main, 0, (main_x / 2));
+		wprintw(win_main, "CCHAT");
+		wmove(win_main, row, 1); 
 		wrefresh(win_main);
-		if (row <= max_x)
+		if (row < main_y - 2)
 		{
 			++row;
 		}
