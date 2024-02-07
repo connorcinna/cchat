@@ -84,8 +84,14 @@ void init_ncurses(void)
 	wmove(win_msg, 0, (msg_x / 8));
 	wprintw(win_msg, "Type a message");
 
-//	wmove(win_clients, 0, (clients_x / 2));
+//	int ret;
+//	ret = (wmove(win_clients, 0, (clients_x / 2) - 4));
+//	wrefresh(win_clients);
+//	debug_log(INFO, __FILE__, "moved cursor to 0, %d, ret: %d\n", (clients_x/2) - 2, ret);
 //	wprintw(win_clients, "ROOM");
+//	wmove(win_clients, 1, 1);
+//	wprintw(win_clients, "%s\n", peers[0]);	
+
 	
 	wmove(win_msg, 1, 1);
 
@@ -97,7 +103,6 @@ void init_ncurses(void)
 	wbkgd(win_main, COLOR_PAIR(1));
 	wbkgd(win_msg, COLOR_PAIR(1));
 	wbkgd(win_clients, COLOR_PAIR(1));
-
 
 	wrefresh(win_main);
 	wrefresh(win_clients);
@@ -125,8 +130,10 @@ void init(char* s_addr, char* s_port)
 	//set the first peer in the client list -- ourself
 	wmove(win_clients, 1, 1);
 	wprintw(win_clients, "%s\n", peers[0]);	
+
+	box(win_clients,ACS_VLINE, ACS_HLINE);
 	//refresh 
-	wmove(win_clients, 0, (clients_x / 2));
+	wmove(win_clients, 0, (clients_x / 2)-1);
 	wprintw(win_clients, "ROOM");
 
 	wrefresh(win_clients);
@@ -136,9 +143,6 @@ void work(char* name)
 {
 	char buf[BUF_SZ];
 	char tmp[BUF_SZ];
-	wmove(win_clients, 0, ((clients_x / 2)-1));
-	wprintw(win_clients, "ROOM");
-	wrefresh(win_clients);
 	for(;;)
 	{
 		memset(buf, 0, BUF_SZ);
@@ -223,19 +227,11 @@ void write_name(char* name)
 	fclose(f);
 }
 //TODO: clean this mess up, make a generic refresh function(?) for whenever we call the combination move, print, box, refresh functions
-static void read_resp(void) 
+void read_resp(void) 
 {
 	char buf[BUF_SZ];
 	uint32_t peer_count = 1; //we have at least one peer - ourself
 						 
-	wmove(win_clients, 0, ((clients_x / 2)-1));
-	wprintw(win_clients, "ROOM");
-
-//	wmove(win_clients, 1, 1);
-//	wprintw(win_clients, "%s\n", peers[0]);
-
-	box(win_clients, ACS_VLINE, ACS_HLINE);
-	wrefresh(win_clients);
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
@@ -243,8 +239,9 @@ static void read_resp(void)
 		char* tmp = strdup(buf);
 		strtok(tmp, ":");
 		debug_log(INFO, __FILE__, "%s", tmp);
-		//iterate through our list of peers to see if we already know about this peer. if we do, break and continue.
+		//iterate through our list of peers to see if we already know about this peer. if we do, break and continue
 		//if we don't, set the flag for the peer to be added to the list
+		//TODO: break out into function
 		int32_t flag = 0;
 		for (int i = 0; i < peer_count; ++i) 
 		{
@@ -269,7 +266,7 @@ static void read_resp(void)
 			wrefresh(win_clients);
 		}
 		wmove(win_main, row, 1);
-		wprintw(win_main,"%s\n", buf);
+		wprintw(win_main,"%s", buf);
 
 		box(win_main, ACS_VLINE, ACS_HLINE);
 		wmove(win_main, 0, (main_x / 2));
