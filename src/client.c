@@ -66,9 +66,9 @@ void init_ncurses(void)
 	getmaxyx(win_msg, msg_y, msg_x);
 	getmaxyx(win_clients, clients_y, clients_x);
 
-	box(win_main, '|', '-');
-	box(win_msg, '|', '-');
-	box(win_clients, '|', '-');
+	box(win_main, ACS_VLINE, ACS_HLINE);
+	box(win_msg, ACS_VLINE, ACS_HLINE);
+	box(win_clients, ACS_VLINE, ACS_HLINE);
 
 	scrollok(win_main, TRUE);
 	scrollok(win_msg, TRUE);
@@ -146,8 +146,8 @@ void work(char* name)
 		wprintw(win_main, "%s", tmp);
 		wmove(win_msg, 1, 1);
 
-		box(win_msg, '|', '-');
-		box(win_main, '|', '-');
+		box(win_msg, ACS_VLINE, ACS_HLINE);
+		box(win_main, ACS_VLINE, ACS_HLINE);
 
 		wrefresh(win_main);
 		wrefresh(win_msg);
@@ -204,13 +204,13 @@ static void read_resp(void)
 {
 	char buf[BUF_SZ];
 	uint32_t peer_count = 1; //we have at least one peer - ourself
-	wmove(win_clients, 0, (clients_x / 2));
+	wmove(win_clients, 0, ((clients_x / 2)-1));
 	wprintw(win_clients, "ROOM");
 
 //	wmove(win_clients, 1, 1);
 //	wprintw(win_clients, "%s\n", peers[0]);
 
-//	box(win_clients, '|', '-');
+//	box(win_clients, ACS_VLINE, ACS_HLINE);
 	wrefresh(win_clients);
 	for(;;) 
 	{
@@ -239,12 +239,12 @@ static void read_resp(void)
 			++peer_count;
 			wmove(win_clients, peer_count, 1);
 			wprintw(win_clients, "%s\n", tmp);
-			box(win_clients, '|', '-');
+			box(win_clients, ACS_VLINE, ACS_HLINE);
 			wrefresh(win_clients);
 		}
 		wmove(win_main, row, 1);
 		wprintw(win_main,"%s\n", buf);
-		box(win_main, '|', '-');
+		box(win_main, ACS_VLINE, ACS_HLINE);
 		wrefresh(win_main);
 		if (row <= max_x)
 		{

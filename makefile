@@ -1,9 +1,9 @@
-CC=gcc
+CC=gcc -D_XOPEN_SOURCE_EXTENDED
 CLFAGS=-I. -g
 SRCDIR=$(CURDIR)/src
 BUILDDIR=$(CURDIR)/bin
 LIBDIR=$(CURDIR)/lib
-LIBS=-lncurses
+LIBS=-lncursesw
 LOGDIR=$(CURDIR)/log
 
 dirs: 
