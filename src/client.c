@@ -116,7 +116,10 @@ void init(char* s_addr, char* s_port)
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
     server.sin_addr.s_addr = inet_addr(s_addr);
-
+	char str[INET_ADDRSTRLEN];
+	struct sockaddr_in copy;
+	inet_ntop(server.sin_family, &(((struct sockaddr_in*)&server)->sin_addr), str, INET_ADDRSTRLEN);
+	debug_log(INFO, __FILE__, "in init: server address: %s\n", str);
     if (!(sockfd = socket(AF_INET, SOCK_STREAM, 0))) 
     {
         debug_log(FATAL, __FILE__, "Unable to open socket: %s\n", strerror(errno));
@@ -138,20 +141,52 @@ void init(char* s_addr, char* s_port)
 
 	wrefresh(win_clients);
 }
-//TODO; have a way to initialize ROOM client list in one spot. should be easy but i cant think
+
 void work(char* name) 
 {
 	char buf[BUF_SZ];
 	char tmp[BUF_SZ];
+	//format for a message:
+	//name + ": " + msg 
+	//so the message size can be BUF_SZ - name size - 2
+	uint32_t max_msg_size = BUF_SZ - (sizeof(name)) - 2;
 	for(;;)
 	{
 		memset(buf, 0, BUF_SZ);
-		ssize_t bytes_read = read(STDIN_FILENO, buf, BUF_SZ);
-		//wrefresh(win_main);
-		//format:
-		//name + ": " + msg 
-		//so the message size can be BUF_SZ - name size - 2
-		if (bytes_read > (BUF_SZ - (sizeof(name) + 2) ))
+////////////////////////////////////////////////////////////////////////////////
+//		uint32_t ch;
+//		ssize_t bytes_read = 0;
+//		while(ch = getch()) 
+//		{
+//			if (ch == KEY_ENTER)
+//			{
+//				buf[bytes_read] = '\n';
+//				buf[++bytes_read] = '\0';
+//				wclear(win_msg);
+//				break;
+//			}
+//			else 
+//			{
+//				if (bytes_read < (BUF_SZ - sizeof(name) - 2))
+//				{
+//					buf[bytes_read] = ch;
+//				}			
+//				wprintw(win_msg, "%s", buf);
+//				wrefresh(win_msg);
+//			}
+//			bytes_read++;
+//		}
+//
+//		cbreak();
+//		ssize_t bytes_read = read(STDIN_FILENO, buf, BUF_SZ);
+		wmove(win_msg, 1, 1);
+		wgetnstr(win_msg, buf, max_msg_size);	
+
+		wclear(win_msg);
+		size_t bytes_read = strlen(buf);
+//		nocbreak();
+////////////////////////////////////////////////////////////////////////////////
+		if (bytes_read > max_msg_size)
 		{
 			//TODO: split up the message into chunks
 			debug_log(INFO, __FILE__, "Message too long -- discarding\n");
