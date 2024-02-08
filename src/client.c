@@ -156,8 +156,10 @@ void init(char* s_addr, char* s_port)
 		debug_log(INFO, __FILE__, "read %d bytes from server for name: they say %s\n", name_rcvd, name_buf);
 		wmove(win_clients, i, 1);
 		wprintw(win_clients, name_buf);
+		wrefresh(win_clients);
 		peers[i] = name_buf;
 	}
+	debug_log(INFO, __FILE__, "done reading names from the server, moving on to work loop\n");
 
 	//set the first peer in the client list -- ourself
 //	wmove(win_clients, 1, 1);
@@ -267,7 +269,6 @@ void read_resp(void)
 {
 	char buf[BUF_SZ];
 	uint32_t peer_count = 1; //we have at least one peer - ourself
-						 
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
@@ -300,6 +301,12 @@ void read_resp(void)
 			wmove(win_clients, 0, ((clients_x / 2)-1));
 			wprintw(win_clients, "ROOM");
 			wrefresh(win_clients);
+			//if the message is literally just the name, don't print to the screen
+			debug_log(WARN, __FILE__, "tmp: %s buf: %s sizeof(tmp): %d sizeof(buf): %d\n", tmp, buf, sizeof(tmp), sizeof(buf));
+			if (!strcmp(tmp, buf))
+			{
+				continue;
+			}
 		}
 		wmove(win_main, row, 1);
 		wprintw(win_main,"%s", buf);
