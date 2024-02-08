@@ -61,13 +61,26 @@ int32_t main(uint32_t argc, char** argv)
 		{
 			debug_log(WARN, __FILE__, "Failed to accept connection from client %d: %s", num_conn, strerror(errno));
 		}
-		debug_log(INFO, __FILE__, "New client connected on fd: %d\n", connfds[num_conn]);
+		++num_conn;
+		debug_log(INFO, __FILE__, "New client connected on fd: %d\n", connfds[num_conn-1]);
+		//right after connecting, the client will send it's name, so be ready to receive it
+		char name_buf[BUF_SZ];
+		ssize_t rcvd = read(connfds[num_conn-1], name_buf, BUF_SZ);
+		//first tell the connecting client how many names to expect
+		debug_log(INFO, __FILE__, "sending %d to client\n", num_conn);
+		//TODO seems to work for 1st client getting its own and 2nd clients name, 2nd client is frozen
+		sendto(connfds[num_conn-1], (void*) &num_conn, sizeof(num_conn), 0, (struct sockaddr*) &clients[num_conn-1], sizeof(clients[num_conn-1]));
+		for (int i = 0; i < num_conn; ++i)
+		{
+			debug_log(INFO, __FILE__, "telling client %d about new client %s\n", i, name_buf);
+			socklen_t client_len = sizeof(clients[i]);
+			sendto(connfds[i], (void*) name_buf, BUF_SZ, 0, (struct sockaddr*) &clients[i], client_len);
+		}
 		pthread_t t;
-		if ((pthread_create(&t, NULL, (void*) work, (void*) &connfds[num_conn]))) 
+		if ((pthread_create(&t, NULL, (void*) work, (void*) &connfds[num_conn-1]))) 
 		{
 			debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
 		}
-		++num_conn;
 	}
 
 	for (;;) 

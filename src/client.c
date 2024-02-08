@@ -130,9 +130,38 @@ void init(char* s_addr, char* s_port)
 		debug_log(FATAL, __FILE__, "Unable to connect to server: %s\n", strerror(errno));
         exit(-1);
     }
+	
+	//register our name with the server
+	debug_log(INFO, __FILE__, "Sending %s to server\n", peers[0]);
+	sendto(sockfd, (void*) peers[0], BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
+	//the first part of the server's response will be how many names to expect to read
+	uint32_t num_names;
+	char num_names_buf[BUF_SZ];
+	memset(num_names_buf, 0, BUF_SZ);
+	uint32_t rcvd = read(sockfd, num_names_buf, BUF_SZ);
+	debug_log(INFO, __FILE__, "Read %d bytes from initial contact with server, they say %s\n", rcvd, num_names_buf);
+	if (rcvd < 0) 
+	{
+		debug_log(WARN, __FILE__, "Failed to read name size from server\n");
+	}
+
+	num_names = (uint32_t) num_names_buf[0];
+	debug_log(INFO, __FILE__, "num_names = %d\n", num_names);
+	//the second part will be the names themselves
+	char name_buf[BUF_SZ];
+	for (int i = 1; i <= num_names; ++i)
+	{
+		memset(name_buf, 0, BUF_SZ);
+		uint32_t name_rcvd = read(sockfd, name_buf, BUF_SZ);
+		debug_log(INFO, __FILE__, "read %d bytes from server for name: they say %s\n", name_rcvd, name_buf);
+		wmove(win_clients, i, 1);
+		wprintw(win_clients, name_buf);
+		peers[i] = name_buf;
+	}
+
 	//set the first peer in the client list -- ourself
-	wmove(win_clients, 1, 1);
-	wprintw(win_clients, "%s\n", peers[0]);	
+//	wmove(win_clients, 1, 1);
+//	wprintw(win_clients, "%s\n", peers[0]);	
 
 	box(win_clients,ACS_VLINE, ACS_HLINE);
 	//refresh 
@@ -153,39 +182,11 @@ void work(char* name)
 	for(;;)
 	{
 		memset(buf, 0, BUF_SZ);
-////////////////////////////////////////////////////////////////////////////////
-//		uint32_t ch;
-//		ssize_t bytes_read = 0;
-//		while(ch = getch()) 
-//		{
-//			if (ch == KEY_ENTER)
-//			{
-//				buf[bytes_read] = '\n';
-//				buf[++bytes_read] = '\0';
-//				wclear(win_msg);
-//				break;
-//			}
-//			else 
-//			{
-//				if (bytes_read < (BUF_SZ - sizeof(name) - 2))
-//				{
-//					buf[bytes_read] = ch;
-//				}			
-//				wprintw(win_msg, "%s", buf);
-//				wrefresh(win_msg);
-//			}
-//			bytes_read++;
-//		}
-//
-//		cbreak();
-//		ssize_t bytes_read = read(STDIN_FILENO, buf, BUF_SZ);
 		wmove(win_msg, 1, 1);
 		wgetnstr(win_msg, buf, max_msg_size);	
 
 		wclear(win_msg);
 		size_t bytes_read = strlen(buf);
-//		nocbreak();
-////////////////////////////////////////////////////////////////////////////////
 		if (bytes_read > max_msg_size)
 		{
 			//TODO: split up the message into chunks
