@@ -132,17 +132,14 @@ void init(char* s_addr, char* s_port)
     }
 	
 	//register our name with the server
-	debug_log(INFO, __FILE__, "Sending %s to server\n", peers[0]);
 	sendto(sockfd, (void*) peers[0], sizeof(peers[0]), 0, (struct sockaddr*) &server, sizeof(server));
 	char rcv_buf[BUF_SZ];
 	//read the server's response in the format "name,name,name,name"
 	memset(rcv_buf, 0, BUF_SZ);
 	read(sockfd, rcv_buf, BUF_SZ);
-	debug_log(INFO, __FILE__, "rcv_buf on client: %s\n", rcv_buf);
 	//the first string is read by this one, and we check if theres more
 	char* pch;
 	pch = strtok(rcv_buf, ",");
-	debug_log(INFO, __FILE__, "first pch: %s\n", pch);
 	wmove(win_clients, 1, 1);
 	wprintw(win_clients, pch);
 	wrefresh(win_clients);
@@ -150,7 +147,6 @@ void init(char* s_addr, char* s_port)
 	int i = 1;
 	while (pch = strtok(NULL, ","))
 	{
-		debug_log(INFO, __FILE__, "pch in loop: %s\n", pch);
 		wmove(win_clients, i + 1, 1);
 		wprintw(win_clients, pch);
 		wrefresh(win_clients);
@@ -159,10 +155,6 @@ void init(char* s_addr, char* s_port)
 	}
 
 	debug_log(INFO, __FILE__, "done reading names from the server, moving on to work loop\n");
-
-	//set the first peer in the client list -- ourself
-//	wmove(win_clients, 1, 1);
-//	wprintw(win_clients, "%s\n", peers[0]);	
 
 	box(win_clients,ACS_VLINE, ACS_HLINE);
 	//refresh 

@@ -25,29 +25,31 @@ char* client_names[MAX_CONN];
 void handle_new_client(struct sockaddr_in* client)
 {
 	char rcv_buf[16];
-	char reply_buf[BUF_SZ];
+	char send_buf[BUF_SZ];
 	memset(rcv_buf, 0, sizeof(rcv_buf));
-	memset(reply_buf, 0, BUF_SZ);
+	memset(send_buf, 0, BUF_SZ);
 	//first receive the client's name, which is the first thing they do when connecting
 	ssize_t rcvd = read(connfds[num_conn], rcv_buf, sizeof(rcv_buf));
 	//register the new client into client_names
 	client_names[num_conn] = strdup(rcv_buf);
 	for (int i = 0; i <= num_conn; ++i)
 	{
-		strcat(reply_buf, client_names[i]);
-		strcat(reply_buf, ",");
+		strcat(send_buf, client_names[i]);
+		strcat(send_buf, ",");
 	}
-	debug_log(INFO, __FILE__, "reply_buf: %s\n", reply_buf);
-	sendto(connfds[num_conn], &reply_buf, BUF_SZ, 0, (struct sockaddr*) &clients[num_conn], sizeof(clients[num_conn]));
+	sendto(connfds[num_conn], &send_buf, BUF_SZ, 0, (struct sockaddr*) &clients[num_conn], sizeof(clients[num_conn]));
 }
 
 void update_clients()
 {
+	char send_buf[BUF_SZ];
 	for (int i = 0; i < num_conn; ++i)
 	{
-		debug_log(INFO, __FILE__, "telling client %d about new client %s\n", i, client_names[num_conn]);
+		memset(send_buf, 0, BUF_SZ);
+		strcat(send_buf, client_names[num_conn]);
 		socklen_t client_len = sizeof(clients[num_conn]);
-		sendto(connfds[i], &client_names[num_conn], sizeof(client_names[num_conn]), 0, (struct sockaddr*) &clients[num_conn], client_len);
+		debug_log(INFO, __FILE__, "telling client %d about new client %s\n", i, client_names[num_conn]);
+		sendto(connfds[i], &send_buf, BUF_SZ, 0, (struct sockaddr*) &clients[i], client_len);
 	}
 }
 
@@ -99,7 +101,7 @@ int32_t main(uint32_t argc, char** argv)
 		//right after connecting, the client will send it's name, so be ready to receive it
 		handle_new_client(&client);
 		//now that the server knows about the new client, update all the existing clients
-//		update_clients();
+		update_clients();
 		//spawn thread to handle this connection
 		pthread_t t;
 		if ((pthread_create(&t, NULL, (void*) work, (void*) &connfds[num_conn]))) 
