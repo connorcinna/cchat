@@ -17,6 +17,7 @@ enum log_severity
     DEFAULT
 };
 
+
 typedef enum log_severity log_severity_t;
 
 //initializes the log path for this module

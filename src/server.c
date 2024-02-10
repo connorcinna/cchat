@@ -14,11 +14,42 @@
 //the server port
 static uint32_t port; 
 //all of the file descriptors open by the server
-static uint32_t connfds[MAX_CONN];
+uint32_t connfds[MAX_CONN];
 //all of the clients the server knows about
-static struct sockaddr_in clients[MAX_CONN];
+struct sockaddr_in clients[MAX_CONN];
 //the total number of connections right now
-static uint32_t num_conn = 0;
+uint32_t num_conn = 0;
+//the names of all the clients connected
+char* client_names[MAX_CONN];
+
+void handle_new_client(struct sockaddr_in* client)
+{
+	char rcv_buf[16];
+	char reply_buf[BUF_SZ];
+	memset(rcv_buf, 0, sizeof(rcv_buf));
+	memset(reply_buf, 0, BUF_SZ);
+	//first receive the client's name, which is the first thing they do when connecting
+	ssize_t rcvd = read(connfds[num_conn], rcv_buf, sizeof(rcv_buf));
+	//register the new client into client_names
+	client_names[num_conn] = strdup(rcv_buf);
+	for (int i = 0; i <= num_conn; ++i)
+	{
+		strcat(reply_buf, client_names[i]);
+		strcat(reply_buf, ",");
+	}
+	debug_log(INFO, __FILE__, "reply_buf: %s\n", reply_buf);
+	sendto(connfds[num_conn], &reply_buf, BUF_SZ, 0, (struct sockaddr*) &clients[num_conn], sizeof(clients[num_conn]));
+}
+
+void update_clients()
+{
+	for (int i = 0; i < num_conn; ++i)
+	{
+		debug_log(INFO, __FILE__, "telling client %d about new client %s\n", i, client_names[num_conn]);
+		socklen_t client_len = sizeof(clients[num_conn]);
+		sendto(connfds[i], &client_names[num_conn], sizeof(client_names[num_conn]), 0, (struct sockaddr*) &clients[num_conn], client_len);
+	}
+}
 
 int32_t main(uint32_t argc, char** argv)
 {
@@ -53,6 +84,9 @@ int32_t main(uint32_t argc, char** argv)
 
 	//bind to a socket and listen to it for incoming connections
 	sockfd = listen_server(port);
+//	set_print_color(WARN);
+	printf("Server running on port %d!\n", port);
+//	set_print_color(DEFAULT);
 	while (num_conn < MAX_CONN) 
 	{
 		struct sockaddr_in client;
@@ -61,26 +95,19 @@ int32_t main(uint32_t argc, char** argv)
 		{
 			debug_log(WARN, __FILE__, "Failed to accept connection from client %d: %s", num_conn, strerror(errno));
 		}
-		++num_conn;
-		debug_log(INFO, __FILE__, "New client connected on fd: %d\n", connfds[num_conn-1]);
+		debug_log(INFO, __FILE__, "New client connected on fd: %d\n", connfds[num_conn]);
 		//right after connecting, the client will send it's name, so be ready to receive it
-		char name_buf[BUF_SZ];
-		ssize_t rcvd = read(connfds[num_conn-1], name_buf, BUF_SZ);
-		//first tell the connecting client how many names to expect
-		debug_log(INFO, __FILE__, "sending %d to client\n", num_conn);
-		//TODO seems to work for 1st client getting its own and 2nd clients name, 2nd client is frozen
-		sendto(connfds[num_conn-1], (void*) &num_conn, sizeof(num_conn), 0, (struct sockaddr*) &clients[num_conn-1], sizeof(clients[num_conn-1]));
-		for (int i = 0; i < num_conn; ++i)
-		{
-			debug_log(INFO, __FILE__, "telling client %d about new client %s\n", i, name_buf);
-			socklen_t client_len = sizeof(clients[i]);
-			sendto(connfds[i], (void*) name_buf, BUF_SZ, 0, (struct sockaddr*) &clients[i], client_len);
-		}
+		handle_new_client(&client);
+		//now that the server knows about the new client, update all the existing clients
+//		update_clients();
+		//spawn thread to handle this connection
 		pthread_t t;
-		if ((pthread_create(&t, NULL, (void*) work, (void*) &connfds[num_conn-1]))) 
+		if ((pthread_create(&t, NULL, (void*) work, (void*) &connfds[num_conn]))) 
 		{
 			debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
 		}
+		++num_conn;
+		debug_log(INFO, __FILE__, "num_conn is now %d\n", num_conn);
 	}
 
 	for (;;) 

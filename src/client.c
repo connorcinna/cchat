@@ -133,32 +133,31 @@ void init(char* s_addr, char* s_port)
 	
 	//register our name with the server
 	debug_log(INFO, __FILE__, "Sending %s to server\n", peers[0]);
-	sendto(sockfd, (void*) peers[0], BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
-	//the first part of the server's response will be how many names to expect to read
-	uint32_t num_names;
-	char num_names_buf[BUF_SZ];
-	memset(num_names_buf, 0, BUF_SZ);
-	uint32_t rcvd = read(sockfd, num_names_buf, BUF_SZ);
-	debug_log(INFO, __FILE__, "Read %d bytes from initial contact with server, they say %s\n", rcvd, num_names_buf);
-	if (rcvd < 0) 
+	sendto(sockfd, (void*) peers[0], sizeof(peers[0]), 0, (struct sockaddr*) &server, sizeof(server));
+	char rcv_buf[BUF_SZ];
+	//read the server's response in the format "name,name,name,name"
+	memset(rcv_buf, 0, BUF_SZ);
+	read(sockfd, rcv_buf, BUF_SZ);
+	debug_log(INFO, __FILE__, "rcv_buf on client: %s\n", rcv_buf);
+	//the first string is read by this one, and we check if theres more
+	char* pch;
+	pch = strtok(rcv_buf, ",");
+	debug_log(INFO, __FILE__, "first pch: %s\n", pch);
+	wmove(win_clients, 1, 1);
+	wprintw(win_clients, pch);
+	wrefresh(win_clients);
+	peers[0] = pch;
+	int i = 1;
+	while (pch = strtok(NULL, ","))
 	{
-		debug_log(WARN, __FILE__, "Failed to read name size from server\n");
+		debug_log(INFO, __FILE__, "pch in loop: %s\n", pch);
+		wmove(win_clients, i + 1, 1);
+		wprintw(win_clients, pch);
+		wrefresh(win_clients);
+		peers[i] = rcv_buf;
+		++i;
 	}
 
-	num_names = (uint32_t) num_names_buf[0];
-	debug_log(INFO, __FILE__, "num_names = %d\n", num_names);
-	//the second part will be the names themselves
-	char name_buf[BUF_SZ];
-	for (int i = 1; i <= num_names; ++i)
-	{
-		memset(name_buf, 0, BUF_SZ);
-		uint32_t name_rcvd = read(sockfd, name_buf, BUF_SZ);
-		debug_log(INFO, __FILE__, "read %d bytes from server for name: they say %s\n", name_rcvd, name_buf);
-		wmove(win_clients, i, 1);
-		wprintw(win_clients, name_buf);
-		wrefresh(win_clients);
-		peers[i] = name_buf;
-	}
 	debug_log(INFO, __FILE__, "done reading names from the server, moving on to work loop\n");
 
 	//set the first peer in the client list -- ourself
@@ -260,7 +259,7 @@ void write_name(char* name)
 	}
 	else
 	{
-		debug_log(INFO, __FILE__, "Writing %s to cache\n", name);
+//		debug_log(INFO, __FILE__, "Writing %s to cache\n", name);
 	}
 	fclose(f);
 }
@@ -383,7 +382,7 @@ int main(int argc, char** argv)
 	}
 	else
 	{
-		debug_log(INFO, __FILE__, "Writing %s to cache for later\n", name);
+//		debug_log(INFO, __FILE__, "Writing %s to cache for later\n", name);
 		write_name(name);
 	}
 	peers[0] = name;
