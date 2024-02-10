@@ -40,6 +40,8 @@ uint32_t clients_y, clients_x = 0;
 uint32_t row = 1;
 //a list of peers that the client knows about -- used for populating the side window
 char* peers[MAX_CONN];
+//the number of peers currently known
+uint32_t peer_count = 0;
 
 //print information regarding how to start the program from commandline and exit
 void usage(void)
@@ -84,15 +86,6 @@ void init_ncurses(void)
 	wmove(win_msg, 0, (msg_x / 8));
 	wprintw(win_msg, "Type a message");
 
-//	int ret;
-//	ret = (wmove(win_clients, 0, (clients_x / 2) - 4));
-//	wrefresh(win_clients);
-//	debug_log(INFO, __FILE__, "moved cursor to 0, %d, ret: %d\n", (clients_x/2) - 2, ret);
-//	wprintw(win_clients, "ROOM");
-//	wmove(win_clients, 1, 1);
-//	wprintw(win_clients, "%s\n", peers[0]);	
-
-	
 	wmove(win_msg, 1, 1);
 
 	if (has_colors())
@@ -116,6 +109,7 @@ void init(char* s_addr, char* s_port)
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
     server.sin_addr.s_addr = inet_addr(s_addr);
+	//TODO put this address string in the title window of the client
 	char str[INET_ADDRSTRLEN];
 	struct sockaddr_in copy;
 	inet_ntop(server.sin_family, &(((struct sockaddr_in*)&server)->sin_addr), str, INET_ADDRSTRLEN);
@@ -144,14 +138,14 @@ void init(char* s_addr, char* s_port)
 	wprintw(win_clients, pch);
 	wrefresh(win_clients);
 	peers[0] = pch;
-	int i = 1;
+	++peer_count;
 	while (pch = strtok(NULL, ","))
 	{
-		wmove(win_clients, i + 1, 1);
+		wmove(win_clients, peer_count + 1, 1);
 		wprintw(win_clients, pch);
 		wrefresh(win_clients);
-		peers[i] = rcv_buf;
-		++i;
+		peers[peer_count] = rcv_buf;
+		++peer_count;
 	}
 
 	debug_log(INFO, __FILE__, "done reading names from the server, moving on to work loop\n");
@@ -259,7 +253,7 @@ void write_name(char* name)
 void read_resp(void) 
 {
 	char buf[BUF_SZ];
-	uint32_t peer_count = 1; //we have at least one peer - ourself
+	debug_log(INFO, __FILE__, "peer_count: %d\n", peer_count);
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
@@ -269,7 +263,6 @@ void read_resp(void)
 		debug_log(INFO, __FILE__, "%s", tmp);
 		//iterate through our list of peers to see if we already know about this peer. if we do, break and continue
 		//if we don't, set the flag for the peer to be added to the list
-		//TODO: break out into function
 		int32_t flag = 0;
 		for (int i = 0; i < peer_count; ++i) 
 		{
@@ -293,7 +286,6 @@ void read_resp(void)
 			wprintw(win_clients, "ROOM");
 			wrefresh(win_clients);
 			//if the message is literally just the name, don't print to the screen
-			debug_log(WARN, __FILE__, "tmp: %s buf: %s sizeof(tmp): %d sizeof(buf): %d\n", tmp, buf, sizeof(tmp), sizeof(buf));
 			if (!strcmp(tmp, buf))
 			{
 				continue;

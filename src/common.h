@@ -5,8 +5,7 @@
 #define BUF_SZ 256
 //TODO: figure out a way to string these macros together 
 //#define LOG_INFO __FILE__ ## __FUNCTION__ ## __LINE__
-
-#define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
+#define ARRAY_SIZE(array) (sizeof((array))/sizeof((array)[0]))
 
 enum log_severity
 {
@@ -35,6 +34,5 @@ void chat_print(char* msg, ...);
 
 //When logging to stdout, set the color ofthe log message depending on the log level
 void set_print_color(log_severity_t level);
-
 
 #endif
