@@ -12,14 +12,16 @@
 #include <ncurses.h>
 #include "common.h"
 
-//this client
+//network info of this client
 struct sockaddr_in client;
-//the server
+//network info of the server
 struct sockaddr_in server;
 //the port to connect to the server on
 static uint16_t port; 
 //the socket we are connect()'ed to
 static uint32_t sockfd;
+//the name of this client
+char* name = NULL;
 //path to config file -- currently only holds a cached name if a user has logged in before
 static char* config_path;
 //a list of peers that the client knows about -- used for populating the side window
@@ -74,8 +76,9 @@ void init_ncurses(void)
 	scrollok(win_msg, TRUE);
 	scrollok(win_clients, TRUE);
 
-	wsetscrreg(win_main, 1, main_y-2);
+	wsetscrreg(win_main, 1, main_y-1);
 	idlok(win_main, TRUE);
+	leaveok(win_main, TRUE);
 	nocbreak();
 
 	wmove(win_main, 0, (main_x / 2));
@@ -141,7 +144,7 @@ void init(char* s_addr, char* s_port)
 		wmove(win_clients, peer_count + 1, 1);
 		wprintw(win_clients, pch);
 		wrefresh(win_clients);
-		peers[peer_count] = rcv_buf;
+		peers[peer_count] = strdup(pch);
 		++peer_count;
 	}
 
@@ -153,7 +156,7 @@ void init(char* s_addr, char* s_port)
 	wrefresh(win_clients);
 }
 
-void work(char* name) 
+void work() 
 {
 	char buf[BUF_SZ];
 	char tmp[BUF_SZ];
@@ -165,6 +168,8 @@ void work(char* name)
 	{
 		memset(buf, 0, BUF_SZ);
 		wmove(win_msg, 1, 1);
+		wprintw(win_msg, "%s:", name);
+		wmove(win_msg, 1, strlen(name) + 3);
 		wgetnstr(win_msg, buf, max_msg_size);	
 
 		wclear(win_msg);
@@ -193,15 +198,22 @@ void work(char* name)
 		wmove(win_msg, 0, (msg_x / 8));
 		wprintw(win_msg, "Type a message");
 		wmove(win_msg, 1, 1);
-
+//		if (row < main_y - 2) //minus 2 for the size of the border
+//		{
+//			++row;
+//			wprintw(win_msg, "%s:", name);
+//		}
+//		else
+//		{
+//			wprintw(win_msg, "%s:\n", name);
+//		}
+		wprintw(win_msg, "%s: ", name);
 		wrefresh(win_main);
 		wrefresh(win_msg);
 		//send "name: msg" back to server
 		sendto(sockfd, (void*) tmp, BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
-		if (row < main_y - 2) //minus 2 for the size of the border
-		{
-			++row;
-		}
+		debug_log(INFO, __FILE__, "row: %d\n", row);
+		++row;
 	}
 }
 char* read_name(char* name) 
@@ -248,7 +260,6 @@ void write_name(char* name)
 void read_resp(void) 
 {
 	char buf[BUF_SZ];
-	debug_log(INFO, __FILE__, "peers[0]: %s\n", peers[0]);
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
@@ -259,7 +270,6 @@ void read_resp(void)
 		int32_t flag = 0;
 		for (int i = 0; i < peer_count; ++i) 
 		{
-			debug_log(INFO, __FILE__, "peers[%d]: %s, tmp: %s, sizeof(peers[%d]): %zu, sizeof(tmp): %zu\n", i, peers[i], tmp, i, sizeof(peers[i], sizeof(tmp)));
 			if (!strcmp(peers[i], tmp)) //equal
 			{
 				flag = 1;	
@@ -267,8 +277,7 @@ void read_resp(void)
 		}
 		if (!flag)
 		{
-			debug_log(INFO, __FILE__, "%s is adding %s to peers at index %d\n", peers[0], tmp, peer_count);
-			peers[peer_count] = tmp;
+			peers[peer_count] = strdup(tmp);
 			++peer_count;
 			wmove(win_clients, peer_count, 1);
 			wprintw(win_clients, "%s\n", tmp);
@@ -284,7 +293,10 @@ void read_resp(void)
 		box(win_main, ACS_VLINE, ACS_HLINE);
 		wmove(win_main, 0, (main_x / 2));
 		wprintw(win_main, "CCHAT");
-		wmove(win_main, row, 1); 
+		wmove(win_msg, 1, 1);
+		wprintw(win_msg, "%s:", name);
+		wmove(win_msg, 1, strlen(name) + 3);
+		wrefresh(win_msg);
 		wrefresh(win_main);
 		if (row < main_y - 2)
 		{
@@ -305,7 +317,6 @@ int main(int argc, char** argv)
 #endif
 	char* s_port = NULL;
 	char* s_addr = NULL;
-	char* name = NULL;
 	int arg;
 
 	while((arg = getopt(argc, argv, "n:p:s:")) != -1) 
@@ -351,7 +362,7 @@ int main(int argc, char** argv)
 	{
 		write_name(name);
 	}
-	peers[0] = name;
+	peers[0] = strdup(name);
 	//get stuff set up
 	init(s_addr, s_port);
 	//have another thread read the return bytes from the server, so clients can see what other clients type
@@ -361,6 +372,7 @@ int main(int argc, char** argv)
 		debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
 	}
 	//do client stuff 
-	work(name);
+//	work(name);
+	work();
 	endwin();
 }

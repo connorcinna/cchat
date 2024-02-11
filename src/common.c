@@ -24,7 +24,6 @@ char cwd[1024];
 void init_log_path(void)
 {
 #ifdef __linux__
-	printf("Linux detected\n");
     if (!getcwd(cwd, sizeof(cwd)))
     {
         printf("Unable to get current working directory: %s\n", strerror(errno));
@@ -32,7 +31,6 @@ void init_log_path(void)
     }
     strcat(cwd, "/log/debug.log");
 #elif _WIN32
-	printf("Windows detected\n");
 	strcat(cwd, "debug.log");
 #else
 #endif
