@@ -16,18 +16,22 @@
 struct sockaddr_in client;
 //the server
 struct sockaddr_in server;
-//the main window where chat between clients is displayed
-WINDOW* win_main;
-//side window where all of the client's names will appear
-WINDOW* win_clients;
-//small bottom window where the user will type their message
-WINDOW* win_msg;
 //the port to connect to the server on
 static uint16_t port; 
 //the socket we are connect()'ed to
 static uint32_t sockfd;
 //path to config file -- currently only holds a cached name if a user has logged in before
 static char* config_path;
+//a list of peers that the client knows about -- used for populating the side window
+static char* peers[MAX_CONN];
+//the number of peers currently known
+static uint32_t peer_count = 0;
+////the main window where chat between clients is displayed
+WINDOW* win_main;
+//side window where all of the client's names will appear
+WINDOW* win_clients;
+//small bottom window where the user will type their message
+WINDOW* win_msg;
 //dimensions of the entire terminal screen
 uint32_t max_y, max_x;
 //dimensions of the main chat window
@@ -38,10 +42,6 @@ uint32_t msg_y, msg_x = 0;
 uint32_t clients_y, clients_x = 0;
 //the current row that the client prints to -- has to be global
 uint32_t row = 1;
-//a list of peers that the client knows about -- used for populating the side window
-char* peers[MAX_CONN];
-//the number of peers currently known
-uint32_t peer_count = 0;
 
 //print information regarding how to start the program from commandline and exit
 void usage(void)
@@ -53,8 +53,6 @@ void usage(void)
 }
 //busy work for setting up structs or initializing variables
 //TODO: do some fancy math to figure out how big these windows need to be instead of using magic numbers
-//TODO: currently, user can't see what they're typing. the cursor moves to the win_msg window, but characters don't show up as they type
-//it can show up with raw(), but that fucks up how often it prints to the screen
 void init_ncurses(void) 
 {
 	initscr();
@@ -261,21 +259,16 @@ void read_resp(void)
 		char* tmp = strdup(buf);
 		strtok(tmp, ":");
 		debug_log(INFO, __FILE__, "%s", tmp);
-		//iterate through our list of peers to see if we already know about this peer. if we do, break and continue
-		//if we don't, set the flag for the peer to be added to the list
+		//see if we already know about this peer. if flag == 1, we know about it already
 		int32_t flag = 0;
 		for (int i = 0; i < peer_count; ++i) 
 		{
-			if (!strcmp(peers[i], tmp))
+			if (!strcmp(peers[i], tmp)) //equal
 			{
-				break;
-			}
-			if (i == peer_count-1)
-			{
-				flag = 1;
+				flag = 1;	
 			}
 		}
-		if (flag)
+		if (!flag)
 		{
 			peers[peer_count] = tmp;
 			++peer_count;
@@ -308,10 +301,18 @@ void read_resp(void)
 
 int main(int argc, char** argv) 
 {
+#ifdef __linux__
+	debug_log(INFO, __FILE__, "Linux detected\n");
 	char* home = getenv("HOME");
 	strcat(home,  "/.config/cchat/config");
 	config_path = strdup(home);
-
+	debug_log(INFO, __FILE__, "config_path: %s\n", config_path);
+#elif _WIN32
+	debug_log(INFO, __FILE__, "Windows detected\n");
+	config_path = "/mnt/c/projects/cchat/config";
+#else 
+#endif
+	debug_log(INFO, __FILE__, "config_path: %s\n", config_path);
 	char* s_port = NULL;
 	char* s_addr = NULL;
 	char* name = NULL;
@@ -323,26 +324,18 @@ int main(int argc, char** argv)
 		{
 			case 'p': 
 				s_port = optarg;
-				debug_log(INFO, __FILE__, "Setting port to %s\n", s_port);
 				break;
 			case 's':
 				s_addr = optarg;
-				debug_log(INFO, __FILE__, "Setting addr to %s\n", s_addr);
 				break;
 			case 'n':
 				name = optarg;
-				debug_log(INFO, __FILE__, "Setting name to %s\n", name);
 			default: 
 		}
 	}
-    if (!s_port) 
+    if (!s_port || !(port = atoi(s_port))) 
     {
         debug_log(FATAL, __FILE__, "No port passed as arg.\n");
-		usage();
-    }
-    if (!(port = atoi(s_port))) 
-    {
-        debug_log(FATAL, __FILE__, "Unable to parse port as number.\n");
 		usage();
     }
 	if (!s_addr) 

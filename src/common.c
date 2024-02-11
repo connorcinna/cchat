@@ -23,11 +23,19 @@ char cwd[1024];
 //if the current directory has a log directory in it, which should be the case if running from root dir 
 void init_log_path(void)
 {
+#ifdef __linux__
+	printf("Linux detected\n");
     if (!getcwd(cwd, sizeof(cwd)))
     {
         printf("Unable to get current working directory: %s\n", strerror(errno));
+		exit(-1);
     }
     strcat(cwd, "/log/debug.log");
+#elif _WIN32
+	printf("Windows detected\n");
+	strcat(cwd, "debug.log");
+#else
+#endif
 }
 
 char* log_prefix(char const* filename)
