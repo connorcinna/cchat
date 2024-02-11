@@ -8,8 +8,6 @@ LOGDIR=$(CURDIR)/log
 
 dirs: 
 	mkdir -p $(BUILDDIR) $(LIBDIR) $(LOGDIR)
-list: $(SRCDIR)/list.c $(SRCDIR)/list.h
-	$(CC) -c -o $(BUILDDIR)/list.o $(SRCDIR)/list.c
 server: $(SRCDIR)/server.c $(SRCDIR)/server.h $(SRCDIR)/common.h
 	$(CC) -o $(BUILDDIR)/server $(SRCDIR)/server.c $(LIBDIR)/libcommon.o -pthread $(LIBS)
 client: $(SRCDIR)/client.c 
@@ -17,7 +15,7 @@ client: $(SRCDIR)/client.c
 common: $(SRCDIR)/common.c $(SRCDIR)/common.h
 	$(CC) -c -o $(LIBDIR)/libcommon.o $(SRCDIR)/common.c
 
-all: dirs list common server client
+all: dirs common server client
 clean: 
 	rm -f $(BUILDDIR)/*
 	rm -f $(LIBDIR)/*

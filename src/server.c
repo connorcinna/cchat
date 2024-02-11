@@ -48,7 +48,6 @@ void update_clients()
 		memset(send_buf, 0, BUF_SZ);
 		strcat(send_buf, client_names[num_conn]);
 		socklen_t client_len = sizeof(clients[num_conn]);
-		debug_log(INFO, __FILE__, "telling client %d about new client %s\n", i, client_names[num_conn]);
 		sendto(connfds[i], &send_buf, BUF_SZ, 0, (struct sockaddr*) &clients[i], client_len);
 	}
 }
@@ -77,7 +76,6 @@ int32_t main(uint32_t argc, char** argv)
         debug_log(FATAL, __FILE__, "No port provided.\n");
         usage();
     }
-	debug_log(INFO, __FILE__, "using port %s\n", s_port);
 	if (!(port = atoi(s_port)))
     {
         debug_log(FATAL, __FILE__, "Unable to parse port into number.\n");
@@ -86,9 +84,9 @@ int32_t main(uint32_t argc, char** argv)
 
 	//bind to a socket and listen to it for incoming connections
 	sockfd = listen_server(port);
-//	set_print_color(WARN);
+	set_print_color(WARN);
 	printf("Server running on port %d!\n", port);
-//	set_print_color(DEFAULT);
+	set_print_color(DEFAULT);
 	while (num_conn < MAX_CONN) 
 	{
 		struct sockaddr_in client;
@@ -109,7 +107,6 @@ int32_t main(uint32_t argc, char** argv)
 			debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
 		}
 		++num_conn;
-		debug_log(INFO, __FILE__, "num_conn is now %d\n", num_conn);
 	}
 
 	for (;;) 
@@ -138,7 +135,6 @@ uint32_t listen_server(uint32_t port)
 		debug_log(FATAL, __FILE__, "Failed to open TCP server socket");
 		exit(-1);
 	}
-	debug_log(INFO, __FILE__, "TCP server socket opened on %d\n", sockfd);
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_family = AF_INET;
 	sa.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -154,7 +150,6 @@ uint32_t listen_server(uint32_t port)
 		debug_log(FATAL, __FILE__, "Server failed to listen on socket %d\n", sockfd);
 		exit(-1);
 	}
-	debug_log(INFO, __FILE__, "Server listening on port %d\n", port);
 	return sockfd;
 }
 //this thread gets initialized for each new connection. it's purpose is to receive data from a client on connfd and 
@@ -177,10 +172,8 @@ void work(void* arg)
 		{
 			if (connfds[i] == connfd) //don't resend the clients message back to itself
 			{
-//				debug_log(INFO, __FILE__, "Skipping sending message to client %d\n", connfds[i]);
 				continue;
 			}
-//			debug_log(INFO, __FILE__, "Sending to client %d\n", connfds[i]);
 			sendto(connfds[i], (void*) buf, rcvd, 0, (struct sockaddr*) &clients[i], sizeof(clients[i]));
 		}
 		memset(buf, 0, BUF_SZ);

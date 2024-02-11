@@ -111,7 +111,6 @@ void init(char* s_addr, char* s_port)
 	char str[INET_ADDRSTRLEN];
 	struct sockaddr_in copy;
 	inet_ntop(server.sin_family, &(((struct sockaddr_in*)&server)->sin_addr), str, INET_ADDRSTRLEN);
-	debug_log(INFO, __FILE__, "in init: server address: %s\n", str);
     if (!(sockfd = socket(AF_INET, SOCK_STREAM, 0))) 
     {
         debug_log(FATAL, __FILE__, "Unable to open socket: %s\n", strerror(errno));
@@ -135,7 +134,7 @@ void init(char* s_addr, char* s_port)
 	wmove(win_clients, 1, 1);
 	wprintw(win_clients, pch);
 	wrefresh(win_clients);
-	peers[0] = pch;
+	peers[0] = strdup(pch);
 	++peer_count;
 	while (pch = strtok(NULL, ","))
 	{
@@ -145,8 +144,6 @@ void init(char* s_addr, char* s_port)
 		peers[peer_count] = rcv_buf;
 		++peer_count;
 	}
-
-	debug_log(INFO, __FILE__, "done reading names from the server, moving on to work loop\n");
 
 	box(win_clients,ACS_VLINE, ACS_HLINE);
 	//refresh 
@@ -251,18 +248,18 @@ void write_name(char* name)
 void read_resp(void) 
 {
 	char buf[BUF_SZ];
-	debug_log(INFO, __FILE__, "peer_count: %d\n", peer_count);
+	debug_log(INFO, __FILE__, "peers[0]: %s\n", peers[0]);
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
 		ssize_t rcvd = read(sockfd, buf, BUF_SZ);
 		char* tmp = strdup(buf);
 		strtok(tmp, ":");
-		debug_log(INFO, __FILE__, "%s", tmp);
 		//see if we already know about this peer. if flag == 1, we know about it already
 		int32_t flag = 0;
 		for (int i = 0; i < peer_count; ++i) 
 		{
+			debug_log(INFO, __FILE__, "peers[%d]: %s, tmp: %s, sizeof(peers[%d]): %zu, sizeof(tmp): %zu\n", i, peers[i], tmp, i, sizeof(peers[i], sizeof(tmp)));
 			if (!strcmp(peers[i], tmp)) //equal
 			{
 				flag = 1;	
@@ -270,6 +267,7 @@ void read_resp(void)
 		}
 		if (!flag)
 		{
+			debug_log(INFO, __FILE__, "%s is adding %s to peers at index %d\n", peers[0], tmp, peer_count);
 			peers[peer_count] = tmp;
 			++peer_count;
 			wmove(win_clients, peer_count, 1);
@@ -278,11 +276,7 @@ void read_resp(void)
 			wmove(win_clients, 0, ((clients_x / 2)-1));
 			wprintw(win_clients, "ROOM");
 			wrefresh(win_clients);
-			//if the message is literally just the name, don't print to the screen
-			if (!strcmp(tmp, buf))
-			{
-				continue;
-			}
+			continue;
 		}
 		wmove(win_main, row, 1);
 		wprintw(win_main,"%s", buf);
@@ -302,17 +296,13 @@ void read_resp(void)
 int main(int argc, char** argv) 
 {
 #ifdef __linux__
-	debug_log(INFO, __FILE__, "Linux detected\n");
 	char* home = getenv("HOME");
 	strcat(home,  "/.config/cchat/config");
 	config_path = strdup(home);
-	debug_log(INFO, __FILE__, "config_path: %s\n", config_path);
 #elif _WIN32
-	debug_log(INFO, __FILE__, "Windows detected\n");
 	config_path = "/mnt/c/projects/cchat/config";
 #else 
 #endif
-	debug_log(INFO, __FILE__, "config_path: %s\n", config_path);
 	char* s_port = NULL;
 	char* s_addr = NULL;
 	char* name = NULL;
@@ -359,7 +349,6 @@ int main(int argc, char** argv)
 	}
 	else
 	{
-//		debug_log(INFO, __FILE__, "Writing %s to cache for later\n", name);
 		write_name(name);
 	}
 	peers[0] = name;
