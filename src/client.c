@@ -156,27 +156,33 @@ void init(char* s_addr, char* s_port)
 	wrefresh(win_clients);
 }
 
-void work() 
+//bruh...
+void work(void) 
 {
 	char buf[BUF_SZ];
 	char tmp[BUF_SZ];
-	uint32_t max_msg_size = BUF_SZ - (strlen(name)) - 2;
-	char clr_buf[max_msg_size];
-	for (int i = 0; i < max_msg_size; ++i)
-	{
-		clr_buf[i] = ' ';	
-	}
-	clr_buf[max_msg_size] = '\0';
 	//format for a message:
 	//name + ": " + msg 
 	//so the message size can be BUF_SZ - name size - 2
+	uint32_t max_msg_sz = BUF_SZ - (strlen(name)) - 2;
+	uint32_t clr_buf_sz = main_x - 2;
+	//an empty buffer to clear out the bottom line of win_main 
+	//without it, the bottom line from the previous call to box() will persist 
+	char clr_buf[clr_buf_sz];
+	for (int i = 0; i < clr_buf_sz; ++i)
+	{
+		clr_buf[i] = ' ';	
+	}
+	clr_buf[clr_buf_sz] = '\0';
+
 	for(;;)
 	{
 		memset(buf, 0, BUF_SZ);
 		wmove(win_msg, 1, 1);
-		wprintw(win_msg, "%s:", name);
+		wprintw(win_msg, "%s: ", name);
 		wmove(win_msg, 1, strlen(name) + 3);
-		wgetnstr(win_msg, buf, max_msg_size);	
+		wgetnstr(win_msg, buf, max_msg_sz);	
+		//TODO: this ^C doesnt get read properly, need to make a proper signal handler.
 		if (!strcmp(buf, "exit") || !strcmp(buf, "^C"))
 		{
 			endwin();
@@ -184,10 +190,10 @@ void work()
 		}
 		wclear(win_msg);
 		size_t bytes_read = strlen(buf);
-		if (bytes_read > max_msg_size)
+		if (bytes_read > max_msg_sz)
 		{
 			//TODO: split up the message into chunks
-			debug_log(INFO, __FILE__, "Message too long -- discarding\n");
+			debug_log(SEVERE, __FILE__, "Message too long -- discarding\n");
 			continue;
 		}
 		memset(tmp, 0, BUF_SZ);
@@ -198,6 +204,8 @@ void work()
 		//put the cursor back to the current row it's on so that output can scroll
 		wmove(win_main, row, 1);
 		wprintw(win_main, "%s", clr_buf);
+		//this is where we write the message to the window
+		wmove(win_main, row, 1);
 		wprintw(win_main, "%s", tmp);
 
 		box(win_msg, ACS_VLINE, ACS_HLINE);
@@ -208,25 +216,26 @@ void work()
 
 		wmove(win_msg, 0, (msg_x / 8));
 		wprintw(win_msg, "Type a message");
-		wmove(win_msg, 1, 1);
+
 		if (row < main_y - 2) //minus 2 for the size of the border
 		{
 			++row;
-			wprintw(win_msg, "%s:", name);
 		}
 		else
 		{
-
-			wprintw(win_msg, "%s:", name);
-//			scroll(win_main);
+			scroll(win_main);
+			box(win_main, ACS_VLINE, ACS_HLINE);
+			wmove(win_main, 0, (main_x / 2));
+			wprintw(win_main, "CCHAT");
+			wmove(win_main, row, 1);
+			wprintw(win_main, "%s", clr_buf);
 		}
-//		wprintw(win_msg, "%s: ", name);
+		wmove(win_msg, 1, 1);
+		wprintw(win_msg, "%s: ", name);
 		wrefresh(win_main);
 		wrefresh(win_msg);
 		//send "name: msg" back to server
 		sendto(sockfd, (void*) tmp, BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
-		debug_log(INFO, __FILE__, "row: %d\n", row);
-//		++row;
 	}
 }
 char* read_name(char* name) 
@@ -273,6 +282,16 @@ void write_name(char* name)
 void read_resp(void) 
 {
 	char buf[BUF_SZ];
+	//duplicate code copy and paste.. fix this later
+	//ideally, the way to fix this is get rid of the work of printing anything in win_main during work, and having it all
+	//be done here as a response read from the server
+	uint32_t clr_buf_sz = main_x - 2;
+	char clr_buf[clr_buf_sz];
+	for (int i = 0; i < clr_buf_sz; ++i)
+	{
+		clr_buf[i] = ' ';	
+	}
+	clr_buf[clr_buf_sz] = '\0';
 	for(;;) 
 	{
 		memset(buf, 0, BUF_SZ);
@@ -301,6 +320,9 @@ void read_resp(void)
 			continue;
 		}
 		wmove(win_main, row, 1);
+		wprintw(win_main, "%s", clr_buf);
+
+		wmove(win_main, row, 1);
 		wprintw(win_main,"%s", buf);
 
 		box(win_main, ACS_VLINE, ACS_HLINE);
@@ -311,9 +333,18 @@ void read_resp(void)
 		wmove(win_msg, 1, strlen(name) + 3);
 		wrefresh(win_msg);
 		wrefresh(win_main);
-		if (row < main_y - 2)
+		if (row < main_y - 2) //minus 2 for the size of the border
 		{
 			++row;
+		}
+		else
+		{
+			scroll(win_main);
+			box(win_main, ACS_VLINE, ACS_HLINE);
+			wmove(win_main, 0, (main_x / 2));
+			wprintw(win_main, "CCHAT");
+			wmove(win_main, row, 1);
+			wprintw(win_main, "%s", clr_buf);
 		}
 	}
 }
