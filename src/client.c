@@ -177,7 +177,11 @@ void work()
 		wprintw(win_msg, "%s:", name);
 		wmove(win_msg, 1, strlen(name) + 3);
 		wgetnstr(win_msg, buf, max_msg_size);	
-
+		if (!strcmp(buf, "exit") || !strcmp(buf, "^C"))
+		{
+			endwin();
+			exit(0);	
+		}
 		wclear(win_msg);
 		size_t bytes_read = strlen(buf);
 		if (bytes_read > max_msg_size)
