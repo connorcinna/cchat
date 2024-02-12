@@ -160,10 +160,16 @@ void work()
 {
 	char buf[BUF_SZ];
 	char tmp[BUF_SZ];
+	uint32_t max_msg_size = BUF_SZ - (strlen(name)) - 2;
+	char clr_buf[max_msg_size];
+	for (int i = 0; i < max_msg_size; ++i)
+	{
+		clr_buf[i] = ' ';	
+	}
+	clr_buf[max_msg_size] = '\0';
 	//format for a message:
 	//name + ": " + msg 
 	//so the message size can be BUF_SZ - name size - 2
-	uint32_t max_msg_size = BUF_SZ - (sizeof(name)) - 2;
 	for(;;)
 	{
 		memset(buf, 0, BUF_SZ);
@@ -187,6 +193,7 @@ void work()
 
 		//put the cursor back to the current row it's on so that output can scroll
 		wmove(win_main, row, 1);
+		wprintw(win_main, "%s", clr_buf);
 		wprintw(win_main, "%s", tmp);
 
 		box(win_msg, ACS_VLINE, ACS_HLINE);
@@ -198,22 +205,24 @@ void work()
 		wmove(win_msg, 0, (msg_x / 8));
 		wprintw(win_msg, "Type a message");
 		wmove(win_msg, 1, 1);
-//		if (row < main_y - 2) //minus 2 for the size of the border
-//		{
-//			++row;
-//			wprintw(win_msg, "%s:", name);
-//		}
-//		else
-//		{
-//			wprintw(win_msg, "%s:\n", name);
-//		}
-		wprintw(win_msg, "%s: ", name);
+		if (row < main_y - 2) //minus 2 for the size of the border
+		{
+			++row;
+			wprintw(win_msg, "%s:", name);
+		}
+		else
+		{
+
+			wprintw(win_msg, "%s:", name);
+//			scroll(win_main);
+		}
+//		wprintw(win_msg, "%s: ", name);
 		wrefresh(win_main);
 		wrefresh(win_msg);
 		//send "name: msg" back to server
 		sendto(sockfd, (void*) tmp, BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
 		debug_log(INFO, __FILE__, "row: %d\n", row);
-		++row;
+//		++row;
 	}
 }
 char* read_name(char* name) 
