@@ -16,6 +16,8 @@
 struct sockaddr_in client;
 //network info of the server
 struct sockaddr_in server;
+//string for holding the address of the server we're connected to 
+static char addr_str[INET_ADDRSTRLEN];
 //the port to connect to the server on
 static uint16_t port; 
 //the socket we are connect()'ed to
@@ -53,6 +55,24 @@ void usage(void)
     printf("If you HAVE run this program before, ~/.config/etc/config contains your cached username.");
 	exit(-1);
 }
+void redraw_main(void)
+{
+	box(win_main, ACS_VLINE, ACS_HLINE);
+	wmove(win_main, 0, (main_x / 2));
+	wprintw(win_main, "CCHAT -- %s", addr_str);
+}
+void redraw_msg(void)
+{
+	box(win_msg, ACS_VLINE, ACS_HLINE);
+	wmove(win_msg, 1, 1);
+	wprintw(win_msg, "%s: ", name);
+}
+void redraw_clients(void)
+{
+	box(win_clients,ACS_VLINE, ACS_HLINE);
+	wmove(win_clients, 0, (clients_x / 2)-1);
+	wprintw(win_clients, "ROOM");
+}
 //busy work for setting up structs or initializing variables
 //TODO: do some fancy math to figure out how big these windows need to be instead of using magic numbers
 void init_ncurses(void) 
@@ -68,10 +88,6 @@ void init_ncurses(void)
 	getmaxyx(win_msg, msg_y, msg_x);
 	getmaxyx(win_clients, clients_y, clients_x);
 
-	box(win_main, ACS_VLINE, ACS_HLINE);
-	box(win_msg, ACS_VLINE, ACS_HLINE);
-	box(win_clients, ACS_VLINE, ACS_HLINE);
-
 	scrollok(win_main, TRUE);
 	scrollok(win_msg, TRUE);
 	scrollok(win_clients, TRUE);
@@ -81,11 +97,10 @@ void init_ncurses(void)
 	leaveok(win_main, TRUE);
 	nocbreak();
 
-	wmove(win_main, 0, (main_x / 2));
-	wprintw(win_main, "CCHAT");
-
-	wmove(win_msg, 0, (msg_x / 8));
-	wprintw(win_msg, "Type a message");
+	log(INFO,"addr_str: %s\n", addr_str);
+	redraw_main();
+	redraw_msg();
+	redraw_clients();
 
 	wmove(win_msg, 1, 1);
 
@@ -94,6 +109,7 @@ void init_ncurses(void)
 		start_color();
 		init_pair(1, COLOR_GREEN, COLOR_BLACK);
 	}
+
 	wbkgd(win_main, COLOR_PAIR(1));
 	wbkgd(win_msg, COLOR_PAIR(1));
 	wbkgd(win_clients, COLOR_PAIR(1));
@@ -105,28 +121,26 @@ void init_ncurses(void)
 }
 void init(char* s_addr, char* s_port) 
 {
-	init_ncurses();
 	memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
     server.sin_addr.s_addr = inet_addr(s_addr);
-	//TODO put this address string in the title window of the client
-	char str[INET_ADDRSTRLEN];
-	struct sockaddr_in copy;
-	inet_ntop(server.sin_family, &(((struct sockaddr_in*)&server)->sin_addr), str, INET_ADDRSTRLEN);
-    if (!(sockfd = socket(AF_INET, SOCK_STREAM, 0))) 
+	if (!(sockfd = socket(AF_INET, SOCK_STREAM, 0))) 
     {
-        debug_log(FATAL, __FILE__, "Unable to open socket: %s\n", strerror(errno));
+        log(FATAL,"Unable to open socket: %s\n", strerror(errno));
         exit(-1);
     }
     if (connect(sockfd, (struct sockaddr*) &server, sizeof(server)))
     {
-		debug_log(FATAL, __FILE__, "Unable to connect to server: %s\n", strerror(errno));
+		log(FATAL,"Unable to connect to server: %s\n", strerror(errno));
         exit(-1);
     }
 	
 	//register our name with the server
 	sendto(sockfd, (void*) peers[0], sizeof(peers[0]), 0, (struct sockaddr*) &server, sizeof(server));
+
+	inet_ntop(server.sin_family, &(((struct sockaddr_in*)&server)->sin_addr), addr_str, INET_ADDRSTRLEN);
+	init_ncurses();
 	char rcv_buf[BUF_SZ];
 	//read the server's response in the format "name,name,name,name"
 	memset(rcv_buf, 0, BUF_SZ);
@@ -135,28 +149,24 @@ void init(char* s_addr, char* s_port)
 	char* pch;
 	pch = strtok(rcv_buf, ",");
 	wmove(win_clients, 1, 1);
-	wprintw(win_clients, pch);
+	wprintw(win_clients, "%s", pch);
 	wrefresh(win_clients);
 	peers[0] = strdup(pch);
 	++peer_count;
 	while (pch = strtok(NULL, ","))
 	{
 		wmove(win_clients, peer_count + 1, 1);
-		wprintw(win_clients, pch);
+		wprintw(win_clients, "%s", pch);
 		wrefresh(win_clients);
 		peers[peer_count] = strdup(pch);
 		++peer_count;
 	}
 
-	box(win_clients,ACS_VLINE, ACS_HLINE);
-	//refresh 
-	wmove(win_clients, 0, (clients_x / 2)-1);
-	wprintw(win_clients, "ROOM");
+	redraw_clients();
 
 	wrefresh(win_clients);
 }
 
-//bruh...
 void work(void) 
 {
 	char buf[BUF_SZ];
@@ -165,15 +175,6 @@ void work(void)
 	//name + ": " + msg 
 	//so the message size can be BUF_SZ - name size - 2
 	uint32_t max_msg_sz = BUF_SZ - (strlen(name)) - 2;
-	uint32_t clr_buf_sz = main_x - 2;
-	//an empty buffer to clear out the bottom line of win_main 
-	//without it, the bottom line from the previous call to box() will persist 
-	char clr_buf[clr_buf_sz];
-	for (int i = 0; i < clr_buf_sz; ++i)
-	{
-		clr_buf[i] = ' ';	
-	}
-	clr_buf[clr_buf_sz] = '\0';
 
 	for(;;)
 	{
@@ -193,7 +194,7 @@ void work(void)
 		if (bytes_read > max_msg_sz)
 		{
 			//TODO: split up the message into chunks
-			debug_log(SEVERE, __FILE__, "Message too long -- discarding\n");
+			log(ERROR,"Message too long -- discarding\n");
 			continue;
 		}
 		memset(tmp, 0, BUF_SZ);
@@ -201,37 +202,8 @@ void work(void)
 		strcat(tmp, ": ");
 		strcat(tmp, buf);
 
-		//put the cursor back to the current row it's on so that output can scroll
-		wmove(win_main, row, 1);
-		wprintw(win_main, "%s", clr_buf);
-		//this is where we write the message to the window
-		wmove(win_main, row, 1);
-		wprintw(win_main, "%s", tmp);
+		redraw_msg();
 
-		box(win_msg, ACS_VLINE, ACS_HLINE);
-		box(win_main, ACS_VLINE, ACS_HLINE);
-
-		wmove(win_main, 0, (main_x / 2));
-		wprintw(win_main, "CCHAT");
-
-		wmove(win_msg, 0, (msg_x / 8));
-		wprintw(win_msg, "Type a message");
-
-		if (row < main_y - 2) //minus 2 for the size of the border
-		{
-			++row;
-		}
-		else
-		{
-			scroll(win_main);
-			box(win_main, ACS_VLINE, ACS_HLINE);
-			wmove(win_main, 0, (main_x / 2));
-			wprintw(win_main, "CCHAT");
-			wmove(win_main, row, 1);
-			wprintw(win_main, "%s", clr_buf);
-		}
-		wmove(win_msg, 1, 1);
-		wprintw(win_msg, "%s: ", name);
 		wrefresh(win_main);
 		wrefresh(win_msg);
 		//send "name: msg" back to server
@@ -243,7 +215,7 @@ char* read_name(char* name)
 	FILE* f = fopen(config_path, "r");
 	if (!f)
 	{
-		debug_log(INFO, __FILE__, "%s does not exist.\n", config_path);
+		log(INFO,"%s does not exist.\n", config_path);
 		return name;
 	}
 	char* line;
@@ -266,28 +238,26 @@ void write_name(char* name)
 	FILE* f = fopen(config_path, "w");
 	if (!f)
 	{
-		debug_log(WARN, __FILE__, "Unable to write username to file: %s\n", strerror(errno));
+		log(WARN,"Unable to write username to file: %s\n", strerror(errno));
 	}
 	if(fprintf(f, "%s", name) < 0)
 	{
-		debug_log(WARN, __FILE__, "Unable to write username to file : %s\n", strerror(errno));
+		log(WARN,"Unable to write username to file : %s\n", strerror(errno));
 	}
 	else
 	{
-//		debug_log(INFO, __FILE__, "Writing %s to cache\n", name);
+		log(INFO,"Writing %s to cache\n", name);
 	}
 	fclose(f);
 }
-//TODO: clean this mess up, make a generic refresh function(?) for whenever we call the combination move, print, box, refresh functions
-void read_resp(void) 
+void handle_resp(void) 
 {
 	char buf[BUF_SZ];
-	//duplicate code copy and paste.. fix this later
-	//ideally, the way to fix this is get rid of the work of printing anything in win_main during work, and having it all
-	//be done here as a response read from the server
+	//buffer of empty spaces to clear out the line that we're about to print on
+	//necessary for making sure the box() drawn from last row is erased
 	uint32_t clr_buf_sz = main_x - 2;
 	char clr_buf[clr_buf_sz];
-	for (int i = 0; i < clr_buf_sz; ++i)
+	for (uint32_t i = 0; i < clr_buf_sz; ++i)
 	{
 		clr_buf[i] = ' ';	
 	}
@@ -300,7 +270,7 @@ void read_resp(void)
 		strtok(tmp, ":");
 		//see if we already know about this peer. if flag == 1, we know about it already
 		int32_t flag = 0;
-		for (int i = 0; i < peer_count; ++i) 
+		for (uint32_t i = 0; i < peer_count; ++i) 
 		{
 			if (!strcmp(peers[i], tmp)) //equal
 			{
@@ -313,10 +283,11 @@ void read_resp(void)
 			++peer_count;
 			wmove(win_clients, peer_count, 1);
 			wprintw(win_clients, "%s\n", tmp);
-			box(win_clients, ACS_VLINE, ACS_HLINE);
-			wmove(win_clients, 0, ((clients_x / 2)-1));
-			wprintw(win_clients, "ROOM");
+
+			redraw_clients();	
+
 			wrefresh(win_clients);
+
 			continue;
 		}
 		wmove(win_main, row, 1);
@@ -325,14 +296,12 @@ void read_resp(void)
 		wmove(win_main, row, 1);
 		wprintw(win_main,"%s", buf);
 
-		box(win_main, ACS_VLINE, ACS_HLINE);
-		wmove(win_main, 0, (main_x / 2));
-		wprintw(win_main, "CCHAT");
+		redraw_main();	
+
 		wmove(win_msg, 1, 1);
-		wprintw(win_msg, "%s:", name);
-		wmove(win_msg, 1, strlen(name) + 3);
-		wrefresh(win_msg);
-		wrefresh(win_main);
+		wprintw(win_msg, "%s: ", name);
+
+
 		if (row < main_y - 2) //minus 2 for the size of the border
 		{
 			++row;
@@ -340,12 +309,16 @@ void read_resp(void)
 		else
 		{
 			scroll(win_main);
-			box(win_main, ACS_VLINE, ACS_HLINE);
-			wmove(win_main, 0, (main_x / 2));
-			wprintw(win_main, "CCHAT");
+			
+			redraw_main();
+			
 			wmove(win_main, row, 1);
 			wprintw(win_main, "%s", clr_buf);
 		}
+
+		wmove(win_msg, 1, strlen(name) + 3);
+		wrefresh(win_main);
+		wrefresh(win_msg);
 	}
 }
 
@@ -380,21 +353,21 @@ int main(int argc, char** argv)
 	}
     if (!s_port || !(port = atoi(s_port))) 
     {
-        debug_log(FATAL, __FILE__, "No port passed as arg.\n");
+        log(FATAL,"No port passed as arg.\n");
 		usage();
     }
 	if (!s_addr) 
     {
-        debug_log(FATAL, __FILE__, "No server address passed as arg.\n");
+        log(FATAL,"No server address passed as arg.\n");
 		usage();
     }
 	if (!name)
 	{
-		debug_log(WARN, __FILE__, "No name passed in -- checking cache\n");
+		log(WARN,"No name passed in -- checking cache\n");
 		name = read_name(name);
 		if (!name)
 		{
-			debug_log(FATAL, __FILE__, "No name found in cache either -- unable to login\n");
+			log(FATAL,"No name found in cache either -- unable to login\n");
 			usage();		
 		}
 		else 
@@ -411,12 +384,11 @@ int main(int argc, char** argv)
 	init(s_addr, s_port);
 	//have another thread read the return bytes from the server, so clients can see what other clients type
 	pthread_t t;
-	if ((pthread_create(&t, NULL, (void*) read_resp, NULL))) 
+	if ((pthread_create(&t, NULL, (void*) handle_resp, NULL))) 
 	{
-		debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
+		log(WARN,"Failed to spawn delegate thread\n");
 	}
 	//do client stuff 
-//	work(name);
 	work();
 	endwin();
 }

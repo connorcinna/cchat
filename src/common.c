@@ -51,10 +51,6 @@ char* log_prefix(char const* filename)
 	return ret;
 }
 
-//TODO: this should end up being an internal call only, and expanded to have function, line number, etc. by
-//using a macro in the files that need it
-//1. define the macro in common.h
-//2. replace instances of debug_log with the macro 
 void debug_log(log_severity_t level, char const* filename, char* msg, ...)
 {
     if (cwd[0] == '\0')
@@ -88,7 +84,7 @@ void debug_log(log_severity_t level, char const* filename, char* msg, ...)
     {
         printw("Error writing to file: %s", strerror(errno));
     }
-    //free resources
+    //free allocations
 	free(pre);
 	fclose(out);
 	va_end(argp);
@@ -109,19 +105,19 @@ void set_print_color(log_severity_t level)
     switch (level) 
     {
         case INFO:
-            printf(log_color[INFO]);
+            printf("%s",log_color[INFO]);
             break;
         case WARN:
-            printf(log_color[WARN]);
+            printf("%s",log_color[WARN]);
             break;
-        case SEVERE:
-            printf(log_color[SEVERE]);
+        case ERROR:
+            printf("%s",log_color[ERROR]);
             break;
         case FATAL:
-            printf(log_color[FATAL]);
+            printf("%s",log_color[FATAL]);
             break;
         default:
-            printf(log_color[DEFAULT]);
+            printf("%s",log_color[DEFAULT]);
             break;
     }
 }

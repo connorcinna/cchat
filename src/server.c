@@ -73,12 +73,12 @@ int32_t main(uint32_t argc, char** argv)
 	}
     if (!s_port)
     {
-        debug_log(FATAL, __FILE__, "No port provided.\n");
+        log(FATAL,"No port provided.\n");
         usage();
     }
 	if (!(port = atoi(s_port)))
     {
-        debug_log(FATAL, __FILE__, "Unable to parse port into number.\n");
+        log(FATAL,"Unable to parse port into number.\n");
         usage();
     }
 
@@ -93,9 +93,9 @@ int32_t main(uint32_t argc, char** argv)
 		socklen_t client_len = sizeof(client);
 		if (!(connfds[num_conn] = accept(sockfd, (struct sockaddr*) &client, &client_len))) 
 		{
-			debug_log(WARN, __FILE__, "Failed to accept connection from client %d: %s", num_conn, strerror(errno));
+			log(WARN,"Failed to accept connection from client %d: %s", num_conn, strerror(errno));
 		}
-		debug_log(INFO, __FILE__, "New client connected on fd: %d\n", connfds[num_conn]);
+		log(INFO,"New client connected on fd: %d\n", connfds[num_conn]);
 		//right after connecting, the client will send it's name, so be ready to receive it
 		handle_new_client(&client);
 		//now that the server knows about the new client, update all the existing clients
@@ -104,7 +104,7 @@ int32_t main(uint32_t argc, char** argv)
 		pthread_t t;
 		if ((pthread_create(&t, NULL, (void*) work, (void*) &connfds[num_conn]))) 
 		{
-			debug_log(WARN, __FILE__, "Failed to spawn delegate thread\n");
+			log(WARN,"Failed to spawn delegate thread\n");
 		}
 		++num_conn;
 	}
@@ -132,7 +132,7 @@ uint32_t listen_server(uint32_t port)
 	uint32_t sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (!sockfd)
 	{
-		debug_log(FATAL, __FILE__, "Failed to open TCP server socket");
+		log(FATAL,"Failed to open TCP server socket\n");
 		exit(-1);
 	}
 	memset(&sa, 0, sizeof(sa));
@@ -142,18 +142,17 @@ uint32_t listen_server(uint32_t port)
 
 	if ((bind(sockfd, (struct sockaddr*)&sa, sizeof(sa))) != 0)
 	{
-		debug_log(FATAL, __FILE__, "Server failed to bind to socket %d\n", sockfd);
+		log(FATAL,"Server failed to bind to socket %d\n", sockfd);
 		exit(-1);
 	}
 	if (listen(sockfd, MAX_CONN) != 0)
 	{
-		debug_log(FATAL, __FILE__, "Server failed to listen on socket %d\n", sockfd);
+		log(FATAL,"Server failed to listen on socket %d\n", sockfd);
 		exit(-1);
 	}
 	return sockfd;
 }
-//this thread gets initialized for each new connection. it's purpose is to receive data from a client on connfd and 
-//then send it to 
+//worker thread to handle the connection with a client. receives data from the client and distributes it to the rest of the clients
 void work(void* arg)
 {
 	uint32_t connfd = *(uint32_t*) arg;
@@ -165,21 +164,17 @@ void work(void* arg)
 		rcvd = read(connfd, buf, BUF_SZ);
 		if (rcvd > 0)
 		{
-			debug_log(INFO, __FILE__, "client %d: %s\n", connfd, buf);
+			log(INFO,"client %d: %s\n", connfd, buf);
 		}
 		//then, here, sendto() every client
 		for (int i = 0; i < num_conn; ++i) 
 		{
-			if (connfds[i] == connfd) //don't resend the clients message back to itself
-			{
-				continue;
-			}
 			sendto(connfds[i], (void*) buf, rcvd, 0, (struct sockaddr*) &clients[i], sizeof(clients[i]));
 		}
 		memset(buf, 0, BUF_SZ);
-		if (strncmp("exit", buf, 4) == 0)
+		if (strncmp("exit", buf, 5) == 0)
 		{
-			debug_log(WARN, __FILE__, "Disconnecting client from server\n");
+			log(WARN,"Disconnecting client from server\n");
 			--num_conn;
 			memset(buf, 0, BUF_SZ);
 			close(connfd);
@@ -187,7 +182,7 @@ void work(void* arg)
 		}
 		else if (rcvd == 0)
 		{
-			debug_log(WARN, __FILE__, "Client disconnect received -- closing connection\n");
+			log(WARN,"Client disconnect received -- closing connection\n");
 			--num_conn;
 			memset(buf, 0, BUF_SZ);
 			close(connfd);

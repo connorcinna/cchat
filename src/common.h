@@ -5,19 +5,21 @@
 #define BUF_SZ 256
 //TODO: figure out a way to string these macros together 
 //#define LOG_INFO __FILE__ ## __FUNCTION__ ## __LINE__
-#define ARRAY_SIZE(array) (sizeof((array))/sizeof((array)[0]))
+#define ARRAY_SIZE(array) (sizeof((array))/sizeof((array)[0])) //i dont actually use this anywhere right now
 
 enum log_severity
 {
     INFO,
     WARN,
-    SEVERE,
+   	ERROR, 
     FATAL,
     DEFAULT
 };
 
 
 typedef enum log_severity log_severity_t;
+
+#define log(log_severity, ...) debug_log(log_severity, __FILE__, __VA_ARGS__)
 
 //initializes the log path for this module
 void init_log_path(void);
