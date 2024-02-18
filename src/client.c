@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <ncurses.h>
+#include <signal.h>
 #include "common.h"
 
 //network info of this client
@@ -47,6 +48,12 @@ uint32_t clients_y, clients_x = 0;
 //the current row that the client prints to -- has to be global
 uint32_t row = 1;
 
+//handle interrupt signal
+void handle_interrupt(int signal)
+{
+	endwin();	
+	exit(0);
+}
 //print information regarding how to start the program from commandline and exit
 void usage(void)
 {
@@ -78,6 +85,7 @@ void redraw_clients(void)
 void init_ncurses(void) 
 {
 	initscr();
+	signal(SIGINT, handle_interrupt);	
 	getmaxyx(stdscr, max_y, max_x);
 
 	win_main = newwin(max_y - 5, max_x - 16, 0, 16);
@@ -97,7 +105,6 @@ void init_ncurses(void)
 	leaveok(win_main, TRUE);
 	nocbreak();
 
-	log(INFO,"addr_str: %s\n", addr_str);
 	redraw_main();
 	redraw_msg();
 	redraw_clients();
@@ -183,11 +190,10 @@ void work(void)
 		wprintw(win_msg, "%s: ", name);
 		wmove(win_msg, 1, strlen(name) + 3);
 		wgetnstr(win_msg, buf, max_msg_sz);	
-		//TODO: this ^C doesnt get read properly, need to make a proper signal handler.
-		if (!strcmp(buf, "exit") || !strcmp(buf, "^C"))
+		//ncurses is weird on windows. this is the best we're getting to signal handling
+		if (!strcmp(buf, "exit") || !strstr(buf, "^C"))
 		{
-			endwin();
-			exit(0);	
+			raise(SIGINT);
 		}
 		wclear(win_msg);
 		size_t bytes_read = strlen(buf);
@@ -255,6 +261,7 @@ void handle_resp(void)
 	char buf[BUF_SZ];
 	//buffer of empty spaces to clear out the line that we're about to print on
 	//necessary for making sure the box() drawn from last row is erased
+	//TODO: have an event to see if window has been resized?
 	uint32_t clr_buf_sz = main_x - 2;
 	char clr_buf[clr_buf_sz];
 	for (uint32_t i = 0; i < clr_buf_sz; ++i)
