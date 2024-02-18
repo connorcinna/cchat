@@ -48,12 +48,44 @@ uint32_t clients_y, clients_x = 0;
 //the current row that the client prints to -- has to be global
 uint32_t row = 1;
 
-//handle interrupt signal
-void handle_interrupt(int signal)
+void size_warning()
 {
-	endwin();	
-	exit(0);
+	
 }
+//initialize windows or handle resize events
+void determine_win_size()
+{
+	getmaxyx(stdscr, max_y, max_x);
+	if (max_y < 10 || max_x < 16)
+	{
+		size_warning();
+		return;
+	}
+
+	wresize(win_main, max_y  - 5, max_x - 16);
+	wresize(win_msg, 5, max_x - 16);
+	wresize(win_clients, max_y, 16);
+
+	getmaxyx(win_main, main_y, main_x);
+	getmaxyx(win_msg, msg_y, msg_x);
+	getmaxyx(win_clients, clients_y, clients_x);
+}
+//signal handler
+void handle_signal(int signal)
+{
+	switch (signal)
+	{
+		case SIGINT:
+			log(ERROR, "Interrupt signal received -- shutting down\n");
+			endwin();	
+			exit(0);
+			break;
+		case SIGWINCH:
+			log(INFO, "Resize signal received\n");
+			determine_win_size();
+	}
+}
+
 //print information regarding how to start the program from commandline and exit
 void usage(void)
 {
@@ -81,15 +113,17 @@ void redraw_clients(void)
 	wprintw(win_clients, "ROOM");
 }
 //busy work for setting up structs or initializing variables
-//TODO: do some fancy math to figure out how big these windows need to be instead of using magic numbers
+//TODO: handle resizing
 void init_ncurses(void) 
 {
 	initscr();
-	signal(SIGINT, handle_interrupt);	
 	getmaxyx(stdscr, max_y, max_x);
+	//have to initialize signal handlers after initscr()
+	signal(SIGINT, handle_signal);	
+	signal(SIGWINCH, handle_signal);	
 
 	win_main = newwin(max_y - 5, max_x - 16, 0, 16);
-	win_msg = newwin(5, max_x - 16, max_y - 5, 16);
+    win_msg = newwin(5, max_x - 16, max_y - 5, 16);
 	win_clients = newwin(max_y, 16, 0, 0);
 
 	getmaxyx(win_main, main_y, main_x);
@@ -191,7 +225,7 @@ void work(void)
 		wmove(win_msg, 1, strlen(name) + 3);
 		wgetnstr(win_msg, buf, max_msg_sz);	
 		//ncurses is weird on windows. this is the best we're getting to signal handling
-		if (!strcmp(buf, "exit") || !strstr(buf, "^C"))
+		if (!strcmp(buf, "exit") || strstr(buf, "^C"))
 		{
 			raise(SIGINT);
 		}
@@ -261,7 +295,6 @@ void handle_resp(void)
 	char buf[BUF_SZ];
 	//buffer of empty spaces to clear out the line that we're about to print on
 	//necessary for making sure the box() drawn from last row is erased
-	//TODO: have an event to see if window has been resized?
 	uint32_t clr_buf_sz = main_x - 2;
 	char clr_buf[clr_buf_sz];
 	for (uint32_t i = 0; i < clr_buf_sz; ++i)
@@ -316,13 +349,10 @@ void handle_resp(void)
 		else
 		{
 			scroll(win_main);
-			
 			redraw_main();
-			
 			wmove(win_main, row, 1);
 			wprintw(win_main, "%s", clr_buf);
 		}
-
 		wmove(win_msg, 1, strlen(name) + 3);
 		wrefresh(win_main);
 		wrefresh(win_msg);

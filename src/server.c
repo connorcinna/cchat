@@ -164,7 +164,7 @@ void work(void* arg)
 		rcvd = read(connfd, buf, BUF_SZ);
 		if (rcvd > 0)
 		{
-			log(INFO,"client %d: %s\n", connfd, buf);
+			log(INFO, "%s\n", buf);
 		}
 		//then, here, sendto() every client
 		for (int i = 0; i < num_conn; ++i) 
