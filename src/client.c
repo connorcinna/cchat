@@ -11,7 +11,7 @@
 #include <pthread.h>
 #include <ncurses.h>
 #include <signal.h>
-#include "common.h"
+#include "client.h"
 
 //network info of this client
 struct sockaddr_in client;
@@ -48,12 +48,12 @@ uint32_t clients_y, clients_x = 0;
 //the current row that the client prints to -- has to be global
 uint32_t row = 1;
 
-void size_warning()
+void size_warning(void)
 {
-	
+	log(ERROR, "Window not large enough: Must be at least 16x10\n");
 }
 //initialize windows or handle resize events
-void determine_win_size()
+void determine_win_size(void)
 {
 	getmaxyx(stdscr, max_y, max_x);
 	if (max_y < 10 || max_x < 16)
@@ -62,9 +62,18 @@ void determine_win_size()
 		return;
 	}
 
-	wresize(win_main, max_y  - 5, max_x - 16);
-	wresize(win_msg, 5, max_x - 16);
-	wresize(win_clients, max_y, 16);
+	if ((wresize(win_main, max_y  - 5, max_x - 16)) == ERR)
+	{
+		log(ERROR, "Failed to resize win_main\n");
+	}
+	if ((wresize(win_msg, 5, max_x - 16)) == ERR)
+	{
+		log(ERROR, "Failed to resize win_msg\n");
+	}
+	if ((wresize(win_clients, max_y, 16)) == ERR)
+	{
+		log(ERROR, "Failed to resize win_msg\n");
+	}
 
 	getmaxyx(win_main, main_y, main_x);
 	getmaxyx(win_msg, msg_y, msg_x);
@@ -83,6 +92,12 @@ void handle_signal(int signal)
 		case SIGWINCH:
 			log(INFO, "Resize signal received\n");
 			determine_win_size();
+			redraw_main();
+			redraw_msg();
+			redraw_clients();
+			log(INFO, "new window sizes:\n");
+			log(INFO, "main_x: %d main_y: %d\nmsg_x: %d msg_y: %dclients_x: %d clients_y: %d\n", main_x, main_y, msg_x, msg_y, clients_x, clients_y);
+			log(INFO, "max_x: %d, max_y: %d\n", max_x, max_y);
 	}
 }
 
