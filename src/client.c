@@ -91,13 +91,25 @@ void handle_signal(int signal)
 			break;
 		case SIGWINCH:
 			log(INFO, "Resize signal received\n");
+			endwin();
+			refresh();
+			//after a clear(), we lose everything...
+			//TODO: keep the current buffer in memory and redraw it? idk this seems like a pain in the dick
+			wclear(win_main);
+			wclear(win_msg);
+			wclear(win_clients);
+			clear();
 			determine_win_size();
 			redraw_main();
 			redraw_msg();
 			redraw_clients();
-			log(INFO, "new window sizes:\n");
-			log(INFO, "main_x: %d main_y: %d\nmsg_x: %d msg_y: %dclients_x: %d clients_y: %d\n", main_x, main_y, msg_x, msg_y, clients_x, clients_y);
-			log(INFO, "max_x: %d, max_y: %d\n", max_x, max_y);
+			wrefresh(win_main);
+			wrefresh(win_msg);
+			wrefresh(win_clients);
+			break;
+		default:
+			log(WARN, "signal not recognized\n");
+			break;
 	}
 }
 
@@ -239,10 +251,16 @@ void work(void)
 		wprintw(win_msg, "%s: ", name);
 		wmove(win_msg, 1, strlen(name) + 3);
 		wgetnstr(win_msg, buf, max_msg_sz);	
-		//ncurses is weird on windows. this is the best we're getting to signal handling
-		if (!strcmp(buf, "exit") || strstr(buf, "^C"))
+		//signal handling on WSL doesnt receive this right
+		if (!strcmp(buf, "exit") || buf[0] == SIGINT)
 		{
 			raise(SIGINT);
+		}
+		//if we receive resize signal, we don't want to send anything to the server
+		if (!strcmp(buf, "\0"))
+		{
+			log(INFO, "Empty string, not sending to server\n");	
+			continue;	
 		}
 		wclear(win_msg);
 		size_t bytes_read = strlen(buf);
