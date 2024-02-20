@@ -256,11 +256,10 @@ void work(void)
 		{
 			raise(SIGINT);
 		}
-		//if we receive resize signal, we don't want to send anything to the server
 		if (!strcmp(buf, "\0"))
 		{
 			log(INFO, "Empty string, not sending to server\n");	
-			continue;	
+			continue;
 		}
 		wclear(win_msg);
 		size_t bytes_read = strlen(buf);
