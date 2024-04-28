@@ -1,5 +1,3 @@
-#include "common.h"
-
 void handle_signal(int signal);
 
 void usage(void);

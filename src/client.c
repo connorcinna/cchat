@@ -12,6 +12,7 @@
 #include <ncurses.h>
 #include <signal.h>
 #include "client.h"
+#include "clog.h"
 
 //network info of this client
 struct sockaddr_in client;
@@ -50,7 +51,7 @@ uint32_t row = 1;
 
 void size_warning(void)
 {
-	log(ERROR, "Window not large enough: Must be at least 16x10\n");
+	clog(ERROR, "Window not large enough: Must be at least 16x10\n");
 }
 //initialize windows or handle resize events
 void determine_win_size(void)
@@ -61,20 +62,18 @@ void determine_win_size(void)
 		size_warning();
 		return;
 	}
-
 	if ((wresize(win_main, max_y  - 5, max_x - 16)) == ERR)
 	{
-		log(ERROR, "Failed to resize win_main\n");
+		clog(ERROR, "Failed to resize win_main\n");
 	}
 	if ((wresize(win_msg, 5, max_x - 16)) == ERR)
 	{
-		log(ERROR, "Failed to resize win_msg\n");
+		clog(ERROR, "Failed to resize win_msg\n");
 	}
 	if ((wresize(win_clients, max_y, 16)) == ERR)
 	{
-		log(ERROR, "Failed to resize win_msg\n");
+		clog(ERROR, "Failed to resize win_clients\n");
 	}
-
 	getmaxyx(win_main, main_y, main_x);
 	getmaxyx(win_msg, msg_y, msg_x);
 	getmaxyx(win_clients, clients_y, clients_x);
@@ -85,12 +84,12 @@ void handle_signal(int signal)
 	switch (signal)
 	{
 		case SIGINT:
-			log(ERROR, "Interrupt signal received -- shutting down\n");
+			clog(ERROR, "Interrupt signal received -- shutting down\n");
 			endwin();	
 			exit(0);
 			break;
 		case SIGWINCH:
-			log(INFO, "Resize signal received\n");
+			clog(INFO, "Resize signal received\n");
 			endwin();
 			refresh();
 			//after a clear(), we lose everything...
@@ -98,7 +97,7 @@ void handle_signal(int signal)
 			wclear(win_main);
 			wclear(win_msg);
 			wclear(win_clients);
-			clear();
+//			clear();
 			determine_win_size();
 			redraw_main();
 			redraw_msg();
@@ -108,7 +107,7 @@ void handle_signal(int signal)
 			wrefresh(win_clients);
 			break;
 		default:
-			log(WARN, "signal not recognized\n");
+			clog(WARN, "unrecognized signal\n");
 			break;
 	}
 }
@@ -135,7 +134,7 @@ void redraw_msg(void)
 }
 void redraw_clients(void)
 {
-	box(win_clients,ACS_VLINE, ACS_HLINE);
+	box(win_clients, ACS_VLINE, ACS_HLINE);
 	wmove(win_clients, 0, (clients_x / 2)-1);
 	wprintw(win_clients, "ROOM");
 }
@@ -195,12 +194,12 @@ void init(char* s_addr, char* s_port)
     server.sin_addr.s_addr = inet_addr(s_addr);
 	if (!(sockfd = socket(AF_INET, SOCK_STREAM, 0))) 
     {
-        log(FATAL,"Unable to open socket: %s\n", strerror(errno));
+        clog(FATAL,"Unable to open socket: %s\n", strerror(errno));
         exit(-1);
     }
     if (connect(sockfd, (struct sockaddr*) &server, sizeof(server)))
     {
-		log(FATAL,"Unable to connect to server: %s\n", strerror(errno));
+		clog(FATAL,"Unable to connect to server: %s\n", strerror(errno));
         exit(-1);
     }
 	
@@ -258,7 +257,7 @@ void work(void)
 		}
 		if (!strcmp(buf, "\0"))
 		{
-			log(INFO, "Empty string, not sending to server\n");	
+			clog(INFO, "Empty string, not sending to server\n");	
 			continue;
 		}
 		wclear(win_msg);
@@ -266,7 +265,7 @@ void work(void)
 		if (bytes_read > max_msg_sz)
 		{
 			//TODO: split up the message into chunks
-			log(ERROR,"Message too long -- discarding\n");
+			clog(ERROR,"Message too long -- discarding\n");
 			continue;
 		}
 		memset(tmp, 0, BUF_SZ);
@@ -287,7 +286,7 @@ char* read_name(char* name)
 	FILE* f = fopen(config_path, "r");
 	if (!f)
 	{
-		log(INFO,"%s does not exist.\n", config_path);
+		clog(INFO,"%s does not exist.\n", config_path);
 		return name;
 	}
 	char* line;
@@ -310,15 +309,15 @@ void write_name(char* name)
 	FILE* f = fopen(config_path, "w");
 	if (!f)
 	{
-		log(WARN,"Unable to write username to file: %s\n", strerror(errno));
+		clog(WARN,"Unable to write username to file: %s\n", strerror(errno));
 	}
 	if(fprintf(f, "%s", name) < 0)
 	{
-		log(WARN,"Unable to write username to file : %s\n", strerror(errno));
+		clog(WARN,"Unable to write username to file : %s\n", strerror(errno));
 	}
 	else
 	{
-		log(INFO,"Writing %s to cache\n", name);
+		clog(INFO,"Writing %s to cache\n", name);
 	}
 	fclose(f);
 }
@@ -417,26 +416,27 @@ int main(int argc, char** argv)
 				break;
 			case 'n':
 				name = optarg;
+				break;
 			default: 
 		}
 	}
     if (!s_port || !(port = atoi(s_port))) 
     {
-        log(FATAL,"No port passed as arg.\n");
+        clog(FATAL,"No port passed as arg.\n");
 		usage();
     }
 	if (!s_addr) 
     {
-        log(FATAL,"No server address passed as arg.\n");
+        clog(FATAL,"No server address passed as arg.\n");
 		usage();
     }
 	if (!name)
 	{
-		log(WARN,"No name passed in -- checking cache\n");
+		clog(WARN,"No name passed in -- checking cache\n");
 		name = read_name(name);
 		if (!name)
 		{
-			log(FATAL,"No name found in cache either -- unable to login\n");
+			clog(FATAL,"No name found in cache either -- unable to login\n");
 			usage();		
 		}
 		else 
@@ -455,7 +455,7 @@ int main(int argc, char** argv)
 	pthread_t t;
 	if ((pthread_create(&t, NULL, (void*) handle_resp, NULL))) 
 	{
-		log(WARN,"Failed to spawn delegate thread\n");
+		clog(WARN,"Failed to spawn delegate thread\n");
 	}
 	//do client stuff 
 	work();

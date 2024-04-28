@@ -9,7 +9,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include "server.h"
-#include "common.h"
+#include "clog.h"
 
 //the server port
 static uint32_t port; 
@@ -73,12 +73,12 @@ int32_t main(uint32_t argc, char** argv)
 	}
     if (!s_port)
     {
-        log(FATAL,"No port provided.\n");
+        clog(FATAL,"No port provided.\n");
         usage();
     }
 	if (!(port = atoi(s_port)))
     {
-        log(FATAL,"Unable to parse port into number.\n");
+        clog(FATAL,"Unable to parse port into number.\n");
         usage();
     }
 
@@ -93,9 +93,9 @@ int32_t main(uint32_t argc, char** argv)
 		socklen_t client_len = sizeof(client);
 		if (!(connfds[num_conn] = accept(sockfd, (struct sockaddr*) &client, &client_len))) 
 		{
-			log(WARN,"Failed to accept connection from client %d: %s", num_conn, strerror(errno));
+			clog(WARN,"Failed to accept connection from client %d: %s", num_conn, strerror(errno));
 		}
-		log(INFO,"New client connected on fd: %d\n", connfds[num_conn]);
+		clog(INFO,"New client connected on fd: %d\n", connfds[num_conn]);
 		//right after connecting, the client will send it's name, so be ready to receive it
 		handle_new_client(&client);
 		//now that the server knows about the new client, update all the existing clients
@@ -104,7 +104,7 @@ int32_t main(uint32_t argc, char** argv)
 		pthread_t t;
 		if ((pthread_create(&t, NULL, (void*) work, (void*) &connfds[num_conn]))) 
 		{
-			log(WARN,"Failed to spawn delegate thread\n");
+			clog(WARN,"Failed to spawn delegate thread\n");
 		}
 		++num_conn;
 	}
@@ -132,7 +132,7 @@ uint32_t listen_server(uint32_t port)
 	uint32_t sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (!sockfd)
 	{
-		log(FATAL,"Failed to open TCP server socket\n");
+		clog(FATAL,"Failed to open TCP server socket\n");
 		exit(-1);
 	}
 	memset(&sa, 0, sizeof(sa));
@@ -142,12 +142,12 @@ uint32_t listen_server(uint32_t port)
 
 	if ((bind(sockfd, (struct sockaddr*)&sa, sizeof(sa))) != 0)
 	{
-		log(FATAL,"Server failed to bind to socket %d\n", sockfd);
+		clog(FATAL,"Server failed to bind to socket %d\n", sockfd);
 		exit(-1);
 	}
 	if (listen(sockfd, MAX_CONN) != 0)
 	{
-		log(FATAL,"Server failed to listen on socket %d\n", sockfd);
+		clog(FATAL,"Server failed to listen on socket %d\n", sockfd);
 		exit(-1);
 	}
 	return sockfd;
@@ -164,7 +164,7 @@ void work(void* arg)
 		rcvd = read(connfd, buf, BUF_SZ);
 		if (rcvd > 0)
 		{
-			log(INFO, "%s\n", buf);
+			clog(INFO, "%s\n", buf);
 		}
 		//then, here, sendto() every client
 		for (int i = 0; i < num_conn; ++i) 
@@ -174,7 +174,7 @@ void work(void* arg)
 		memset(buf, 0, BUF_SZ);
 		if (strncmp("exit", buf, 5) == 0)
 		{
-			log(WARN,"Disconnecting client from server\n");
+			clog(WARN,"Disconnecting client from server\n");
 			--num_conn;
 			memset(buf, 0, BUF_SZ);
 			close(connfd);
@@ -182,7 +182,7 @@ void work(void* arg)
 		}
 		else if (rcvd == 0)
 		{
-			log(WARN,"Client disconnect received -- closing connection\n");
+			clog(WARN,"Client disconnect received -- closing connection\n");
 			--num_conn;
 			memset(buf, 0, BUF_SZ);
 			close(connfd);
