@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <ctype.h>
 #include <string.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -22,6 +21,7 @@ uint32_t num_conn = 0;
 //the names of all the clients connected
 char* client_names[MAX_CONN];
 
+//receives the first message from a client, which is it's name, and adds it to the client list
 void handle_new_client(struct sockaddr_in* client)
 {
 	char rcv_buf[16];
@@ -40,7 +40,8 @@ void handle_new_client(struct sockaddr_in* client)
 	sendto(connfds[num_conn], &send_buf, BUF_SZ, 0, (struct sockaddr*) &clients[num_conn], sizeof(clients[num_conn]));
 }
 
-void update_clients()
+//when a message is received from one client, send it to all of them
+void update_clients(void)
 {
 	char send_buf[BUF_SZ];
 	for (int i = 0; i < num_conn; ++i)
@@ -50,6 +51,82 @@ void update_clients()
 		socklen_t client_len = sizeof(clients[num_conn]);
 		sendto(connfds[i], &send_buf, BUF_SZ, 0, (struct sockaddr*) &clients[i], client_len);
 	}
+}
+
+
+//create the listening socket for the server to receive client messages
+uint32_t listen_server(uint32_t port)
+{
+	struct sockaddr_in sa;
+	uint32_t sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (!sockfd)
+	{
+		clog(FATAL,"Failed to open TCP server socket\n");
+		exit(-1);
+	}
+	memset(&sa, 0, sizeof(sa));
+	sa.sin_family = AF_INET;
+	sa.sin_addr.s_addr = htonl(INADDR_ANY);
+	sa.sin_port = htons(port);
+
+	if ((bind(sockfd, (struct sockaddr*)&sa, sizeof(sa))) != 0)
+	{
+		clog(FATAL,"Server failed to bind to socket %d\n", sockfd);
+		exit(-1);
+	}
+	if (listen(sockfd, MAX_CONN) != 0)
+	{
+		clog(FATAL,"Server failed to listen on socket %d\n", sockfd);
+		exit(-1);
+	}
+	return sockfd;
+}
+
+//worker thread to handle the connection with a client. receives data from the client and distributes it to the rest of the clients
+void work(void* arg)
+{
+	uint32_t connfd = *(uint32_t*) arg;
+	char buf[BUF_SZ];
+	ssize_t rcvd;
+	for (;;)
+	{
+		memset(buf, 0, BUF_SZ);
+		rcvd = read(connfd, buf, BUF_SZ);
+		if (rcvd > 0)
+		{
+			clog(INFO, "%s\n", buf);
+		}
+		//then, here, sendto() every client
+		for (int i = 0; i < num_conn; ++i) 
+		{
+			sendto(connfds[i], (void*) buf, rcvd, 0, (struct sockaddr*) &clients[i], sizeof(clients[i]));
+		}
+		memset(buf, 0, BUF_SZ);
+		if (strncmp("exit", buf, 5) == 0)
+		{
+			clog(WARN,"Disconnecting client from server\n");
+			--num_conn;
+			memset(buf, 0, BUF_SZ);
+			close(connfd);
+			return;
+		}
+		else if (rcvd == 0)
+		{
+			clog(WARN,"Client disconnect received -- closing connection\n");
+			--num_conn;
+			memset(buf, 0, BUF_SZ);
+			close(connfd);
+			return;
+		}
+	}
+}
+
+//print usage information on how to run the program
+void usage(void)
+{
+	printf("Usage: server -p [PORT]\n");
+	printf("Begin a TCP server listening on the given port.\n");
+    exit(-1);
 }
 
 int32_t main(uint32_t argc, char** argv)
@@ -115,78 +192,6 @@ int32_t main(uint32_t argc, char** argv)
 		{
 			close(sockfd);
 			exit(0);
-		}
-	}
-}
-
-void usage()
-{
-	printf("Usage: server -p [PORT]\n");
-	printf("Begin a TCP server listening on the given port.\n");
-    exit(-1);
-}
-
-uint32_t listen_server(uint32_t port)
-{
-	struct sockaddr_in sa;
-	uint32_t sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (!sockfd)
-	{
-		clog(FATAL,"Failed to open TCP server socket\n");
-		exit(-1);
-	}
-	memset(&sa, 0, sizeof(sa));
-	sa.sin_family = AF_INET;
-	sa.sin_addr.s_addr = htonl(INADDR_ANY);
-	sa.sin_port = htons(port);
-
-	if ((bind(sockfd, (struct sockaddr*)&sa, sizeof(sa))) != 0)
-	{
-		clog(FATAL,"Server failed to bind to socket %d\n", sockfd);
-		exit(-1);
-	}
-	if (listen(sockfd, MAX_CONN) != 0)
-	{
-		clog(FATAL,"Server failed to listen on socket %d\n", sockfd);
-		exit(-1);
-	}
-	return sockfd;
-}
-//worker thread to handle the connection with a client. receives data from the client and distributes it to the rest of the clients
-void work(void* arg)
-{
-	uint32_t connfd = *(uint32_t*) arg;
-	char buf[BUF_SZ];
-	ssize_t rcvd;
-	for (;;)
-	{
-		memset(buf, 0, BUF_SZ);
-		rcvd = read(connfd, buf, BUF_SZ);
-		if (rcvd > 0)
-		{
-			clog(INFO, "%s\n", buf);
-		}
-		//then, here, sendto() every client
-		for (int i = 0; i < num_conn; ++i) 
-		{
-			sendto(connfds[i], (void*) buf, rcvd, 0, (struct sockaddr*) &clients[i], sizeof(clients[i]));
-		}
-		memset(buf, 0, BUF_SZ);
-		if (strncmp("exit", buf, 5) == 0)
-		{
-			clog(WARN,"Disconnecting client from server\n");
-			--num_conn;
-			memset(buf, 0, BUF_SZ);
-			close(connfd);
-			return;
-		}
-		else if (rcvd == 0)
-		{
-			clog(WARN,"Client disconnect received -- closing connection\n");
-			--num_conn;
-			memset(buf, 0, BUF_SZ);
-			close(connfd);
-			return;
 		}
 	}
 }

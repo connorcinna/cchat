@@ -49,17 +49,13 @@ uint32_t clients_y, clients_x = 0;
 //the current row that the client prints to -- has to be global
 uint32_t row = 1;
 
-void size_warning(void)
-{
-	clog(ERROR, "Window not large enough: Must be at least 16x10\n");
-}
 //initialize windows or handle resize events
 void determine_win_size(void)
 {
 	getmaxyx(stdscr, max_y, max_x);
 	if (max_y < 10 || max_x < 16)
 	{
-		size_warning();
+		clog(ERROR, "Window not large enough: Must be at least 16x10\n");
 		return;
 	}
 	if ((wresize(win_main, max_y  - 5, max_x - 16)) == ERR)
@@ -78,7 +74,8 @@ void determine_win_size(void)
 	getmaxyx(win_msg, msg_y, msg_x);
 	getmaxyx(win_clients, clients_y, clients_x);
 }
-//signal handler
+
+//signal handler -- handles SIGINT and SIGWINCH (window resize)
 void handle_signal(int signal)
 {
 	switch (signal)
@@ -120,25 +117,32 @@ void usage(void)
     printf("If you HAVE run this program before, ~/.config/etc/config contains your cached username.");
 	exit(-1);
 }
+
+//redraw the main window where client messages appear
 void redraw_main(void)
 {
 	box(win_main, ACS_VLINE, ACS_HLINE);
 	wmove(win_main, 0, (main_x / 2));
 	wprintw(win_main, "CCHAT -- %s", addr_str);
 }
+
+//redraw the message box window
 void redraw_msg(void)
 {
 	box(win_msg, ACS_VLINE, ACS_HLINE);
 	wmove(win_msg, 1, 1);
 	wprintw(win_msg, "%s: ", name);
 }
+
+//redraw the client window
 void redraw_clients(void)
 {
 	box(win_clients, ACS_VLINE, ACS_HLINE);
 	wmove(win_clients, 0, (clients_x / 2)-1);
 	wprintw(win_clients, "ROOM");
 }
-//busy work for setting up structs or initializing variables
+
+//set up ncurses windows
 //TODO: handle resizing
 void init_ncurses(void) 
 {
@@ -186,6 +190,8 @@ void init_ncurses(void)
 	wrefresh(win_msg);
 
 }
+
+//set up network structs and initialize ncurses 
 void init(char* s_addr, char* s_port) 
 {
 	memset(&server, 0, sizeof(server));
@@ -234,6 +240,7 @@ void init(char* s_addr, char* s_port)
 	wrefresh(win_clients);
 }
 
+//main loop - draw the window, let the user type into the message box, and send the info to the server
 void work(void) 
 {
 	char buf[BUF_SZ];
@@ -281,6 +288,8 @@ void work(void)
 		sendto(sockfd, (void*) tmp, BUF_SZ, 0, (struct sockaddr*) &server, sizeof(server));
 	}
 }
+
+//check if a clients credentials are saved in the cache
 char* read_name(char* name) 
 {
 	FILE* f = fopen(config_path, "r");
@@ -304,6 +313,7 @@ char* read_name(char* name)
 	fclose(f);
 }
 
+//write a clients credentials to the cache after they've logged in once
 void write_name(char* name) 
 {
 	FILE* f = fopen(config_path, "w");
@@ -311,7 +321,7 @@ void write_name(char* name)
 	{
 		clog(WARN,"Unable to write username to file: %s\n", strerror(errno));
 	}
-	if(fprintf(f, "%s", name) < 0)
+	if (fprintf(f, "%s", name) < 0)
 	{
 		clog(WARN,"Unable to write username to file : %s\n", strerror(errno));
 	}
@@ -321,6 +331,9 @@ void write_name(char* name)
 	}
 	fclose(f);
 }
+
+//receive messages from other clients via the server
+//when a message from the server is received, write it to the chat window
 void handle_resp(void) 
 {
 	char buf[BUF_SZ];
@@ -438,10 +451,6 @@ int main(int argc, char** argv)
 		{
 			clog(FATAL,"No name found in cache either -- unable to login\n");
 			usage();		
-		}
-		else 
-		{
-			write_name(name);
 		}
 	}
 	else
