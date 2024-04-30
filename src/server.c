@@ -9,6 +9,7 @@
 #include <errno.h>
 #include "server.h"
 #include "clog.h"
+#include "constants.h"
 
 //the server port
 static uint32_t port; 

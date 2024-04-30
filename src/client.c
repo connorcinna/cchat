@@ -13,6 +13,7 @@
 #include <signal.h>
 #include "client.h"
 #include "clog.h"
+#include "constants.h"
 
 //network info of this client
 struct sockaddr_in client;

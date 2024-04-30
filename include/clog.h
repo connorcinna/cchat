@@ -1,12 +1,10 @@
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef CLOG_H
+#define CLOG_H
 
 #ifdef __cplusplus
 extern "C"{
 #endif
 
-#define MAX_CONN 10
-#define BUF_SZ 256
 #define ARRAY_SIZE(array) (sizeof((array))/sizeof((array)[0])) //i dont actually use this anywhere right now
 #define ctrl(x) ((x) & 0x1f) //don't use this either, but maybe useful at some point
 
